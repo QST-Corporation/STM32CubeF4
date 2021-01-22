@@ -51,8 +51,7 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-/* UART handler declared in "main.c" file */
-extern UART_HandleTypeDef UartHandle;
+UART_HandleTypeDef UartCom;
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
@@ -173,7 +172,7 @@ void SysTick_Handler(void)
   */
 void USARTx_DMA_RX_IRQHandler(void)
 {
-  HAL_DMA_IRQHandler(UartHandle.hdmarx);
+  HAL_DMA_IRQHandler(UartCom.hdmarx);
 }
 
 /**
@@ -183,7 +182,7 @@ void USARTx_DMA_RX_IRQHandler(void)
   */
 void USARTx_DMA_TX_IRQHandler(void)
 {
-  HAL_DMA_IRQHandler(UartHandle.hdmatx);
+  HAL_DMA_IRQHandler(UartCom.hdmatx);
 }
 
 /**
@@ -193,7 +192,7 @@ void USARTx_DMA_TX_IRQHandler(void)
   */
 void USARTx_IRQHandler(void)
 {
-  HAL_UART_IRQHandler(&UartHandle);
+  HAL_UART_IRQHandler(&UartCom);
 }
 
 /**
