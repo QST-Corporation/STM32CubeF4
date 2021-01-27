@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file    UART/UART_TwoBoards_ComDMA/Src/stm32f4xx_it.c 
+  * @file    UART/UART_TwoBoards_ComPolling/Src/stm32f4xx_it.c 
   * @author  MCD Application Team
   * @brief   Main Interrupt Service Routines.
   *          This file provides template for all exceptions handler and 
@@ -43,7 +43,7 @@
   * @{
   */
 
-/** @addtogroup UART_TwoBoards_ComDMA
+/** @addtogroup UART_TwoBoards_ComPolling
   * @{
   */
 
@@ -51,7 +51,6 @@
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-UART_HandleTypeDef UartCom;
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
@@ -164,36 +163,6 @@ void SysTick_Handler(void)
 /*  available peripheral interrupt handler's name please refer to the startup */
 /*  file (startup_stm32f4xx.s).                                               */
 /******************************************************************************/
-
-/**
-  * @brief  This function handles DMA RX interrupt request.  
-  * @param  None
-  * @retval None    
-  */
-void USARTx_DMA_RX_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(UartCom.hdmarx);
-}
-
-/**
-  * @brief  This function handles DMA TX interrupt request.
-  * @param  None
-  * @retval None  
-  */
-void USARTx_DMA_TX_IRQHandler(void)
-{
-  HAL_DMA_IRQHandler(UartCom.hdmatx);
-}
-
-/**
-  * @brief  This function handles USARTx interrupt request.
-  * @param  None
-  * @retval None
-  */
-void USARTx_IRQHandler(void)
-{
-  HAL_UART_IRQHandler(&UartCom);
-}
 
 /**
   * @brief  This function handles PPP interrupt request.

@@ -31,25 +31,19 @@
 *******************************************************************************/
 
 /******************************************************************************
- * @file    qms7926_flashwrite_uart.c
+ * @file    qms7926_fw_update.h
  * @author  QST AE team
  * @version V0.1
- * @date    2021-01-21
+ * @date    2021-01-22
  * @id      $Id$
- * @brief   This file provides an implementation of the functions for the
- *          UART library.
+ * @brief   This file provides the functions for programming QMS7926 via UART.
  *
  * @note
  *
  *****************************************************************************/
 
-#ifndef _QMS7926_FLASHWRITE_UART_H_
-#define _QMS7926_FLASHWRITE_UART_H_
-
-#include "stm32f4xx_hal.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
+#ifndef _QMS7926_FW_UPDATE_H_
+#define _QMS7926_FW_UPDATE_H_
 
 #ifdef __cplusplus
 extern "C"
@@ -67,6 +61,10 @@ extern "C"
 /******************************************************
  *                   Enumerations
  ******************************************************/
+ 
+/******************************************************
+ *                    Structures
+ ******************************************************/
 
 /******************************************************
  *                 Global Variables
@@ -75,14 +73,10 @@ extern "C"
 /******************************************************
  *             Function Declarations
  ******************************************************/
-//int BSP_COM_Write(const uint8_t* data_out, uint32_t size);
-//int BSP_COM_Read(uint8_t* data_in, uint32_t expected_data_size, uint32_t timeout_ms);
-//int BSP_COM_BytesInBuffer(void);
-//void BSP_COM_IRQHandler(void);
-void BSP_UART_Init(void);
+int qms7926_fw_update(void);
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* _QMS7926_FLASHWRITE_UART_H_ */
+#endif /* _QMS7926_FW_UPDATE_H_ */
