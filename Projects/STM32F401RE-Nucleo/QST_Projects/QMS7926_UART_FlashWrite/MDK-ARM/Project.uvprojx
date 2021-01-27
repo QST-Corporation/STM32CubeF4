@@ -46,7 +46,7 @@
             <NotGenerated>0</NotGenerated>
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
-          <OutputDirectory>STM32F4xx-Nucleo\</OutputDirectory>
+          <OutputDirectory>.\STM32F4xx-Nucleo\</OutputDirectory>
           <OutputName>STM32F4xx-Nucleo</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
@@ -417,14 +417,24 @@
               <FilePath>..\Src\main.c</FilePath>
             </File>
             <File>
-              <FileName>qms7926_flashwrite_uart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Src\qms7926_flashwrite_uart.c</FilePath>
-            </File>
-            <File>
               <FileName>version_print.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Src\version_print.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\bsp_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>qms7926_fw_update.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\qms7926_fw_update.c</FilePath>
+            </File>
+            <File>
+              <FileName>image.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Src\image\image.h</FilePath>
             </File>
           </Files>
         </Group>

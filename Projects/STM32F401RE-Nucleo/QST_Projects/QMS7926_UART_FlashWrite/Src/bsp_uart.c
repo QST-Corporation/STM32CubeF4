@@ -31,7 +31,7 @@
 **************************************************************************************************/
 
 /******************************************************************************
- * @file    qms7926_flashwrite_uart.c
+ * @file    bsp_uart.c
  * @author  QST AE team
  * @version V0.1
  * @date    2021-01-21
@@ -91,7 +91,6 @@
 /* Definition for USART_COM clock resources */
 #define USART_COM_UART                        USART1
 #define USART_COM_CLK_ENABLE()              __HAL_RCC_USART1_CLK_ENABLE();
-#define USART_COM_DMA_CLK_ENABLE()          __HAL_RCC_DMA1_CLK_ENABLE()
 #define USART_COM_RX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
 #define USART_COM_TX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE() 
 
@@ -105,20 +104,6 @@
 #define USART_COM_RX_PIN                    GPIO_PIN_10
 #define USART_COM_RX_GPIO_PORT              GPIOA
 #define USART_COM_RX_AF                     GPIO_AF7_USART1
-
-/* Definition for USART_COM's DMA */
-#define USART_COM_TX_DMA_CHANNEL            DMA_CHANNEL_4
-#define USART_COM_TX_DMA_STREAM             DMA1_Stream6
-#define USART_COM_RX_DMA_CHANNEL            DMA_CHANNEL_4
-#define USART_COM_RX_DMA_STREAM             DMA1_Stream5
-
-/* Definition for USART_COM's NVIC */
-#define USART_COM_DMA_TX_IRQn               DMA1_Stream6_IRQn
-#define USART_COM_DMA_RX_IRQn               DMA1_Stream5_IRQn
-#define USART_COM_DMA_TX_IRQHandler         DMA1_Stream6_IRQHandler
-#define USART_COM_DMA_RX_IRQHandler         DMA1_Stream5_IRQHandler
-#define USART_COM_IRQn                      USART1_IRQn
-#define USART_COM_IRQHandler                USART1_IRQHandler
 
 /******************************************************
  *                    Structures
@@ -270,8 +255,6 @@ void BSP_STDIO_DeInit(void)
   **/
 void BSP_COM_Init(void)
 {
-  static DMA_HandleTypeDef hdma_tx;
-  static DMA_HandleTypeDef hdma_rx;
   GPIO_InitTypeDef  GPIO_InitStruct;
 
   UartCom.Instance          = USART_COM_UART;
@@ -289,8 +272,6 @@ void BSP_COM_Init(void)
   USART_COM_RX_GPIO_CLK_ENABLE();
   /* Enable USART1 clock */
   USART_COM_CLK_ENABLE(); 
-  /* Enable DMA1 clock */
-  USART_COM_DMA_CLK_ENABLE();   
 
   /*##-2- Configure peripheral GPIO ##########################################*/  
   /* UART TX GPIO pin configuration  */
@@ -299,68 +280,14 @@ void BSP_COM_Init(void)
   GPIO_InitStruct.Pull      = GPIO_NOPULL;
   GPIO_InitStruct.Speed     = GPIO_SPEED_FAST;
   GPIO_InitStruct.Alternate = USART_COM_TX_AF;
-  
+
   HAL_GPIO_Init(USART_COM_TX_GPIO_PORT, &GPIO_InitStruct);
-    
+
   /* UART RX GPIO pin configuration  */
   GPIO_InitStruct.Pin = USART_COM_RX_PIN;
   GPIO_InitStruct.Alternate = USART_COM_RX_AF;
     
   HAL_GPIO_Init(USART_COM_RX_GPIO_PORT, &GPIO_InitStruct);
-    
-  /*##-3- Configure the DMA streams ##########################################*/
-  /* Configure the DMA handler for Transmission process */
-  hdma_tx.Instance                 = USART_COM_TX_DMA_STREAM;
-  hdma_tx.Init.Channel             = USART_COM_TX_DMA_CHANNEL;
-  hdma_tx.Init.Direction           = DMA_MEMORY_TO_PERIPH;
-  hdma_tx.Init.PeriphInc           = DMA_PINC_DISABLE;
-  hdma_tx.Init.MemInc              = DMA_MINC_ENABLE;
-  hdma_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-  hdma_tx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-  hdma_tx.Init.Mode                = DMA_NORMAL;
-  hdma_tx.Init.Priority            = DMA_PRIORITY_LOW;
-  hdma_tx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;
-  hdma_tx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
-  hdma_tx.Init.MemBurst            = DMA_MBURST_INC4;
-  hdma_tx.Init.PeriphBurst         = DMA_PBURST_INC4;
-
-  HAL_DMA_Init(&hdma_tx);   
-
-  /* Associate the initialized DMA handle to the the UART handle */
-  __HAL_LINKDMA(&UartCom, hdmatx, hdma_tx);
-
-  /* Configure the DMA handler for Transmission process */
-  hdma_rx.Instance                 = USART_COM_RX_DMA_STREAM;
-  hdma_rx.Init.Channel             = USART_COM_RX_DMA_CHANNEL;
-  hdma_rx.Init.Direction           = DMA_PERIPH_TO_MEMORY;
-  hdma_rx.Init.PeriphInc           = DMA_PINC_DISABLE;
-  hdma_rx.Init.MemInc              = DMA_MINC_ENABLE;
-  hdma_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-  hdma_rx.Init.MemDataAlignment    = DMA_MDATAALIGN_BYTE;
-  hdma_rx.Init.Mode                = DMA_NORMAL;
-  hdma_rx.Init.Priority            = DMA_PRIORITY_HIGH;
-  hdma_rx.Init.FIFOMode            = DMA_FIFOMODE_DISABLE;         
-  hdma_rx.Init.FIFOThreshold       = DMA_FIFO_THRESHOLD_FULL;
-  hdma_rx.Init.MemBurst            = DMA_MBURST_INC4;
-  hdma_rx.Init.PeriphBurst         = DMA_PBURST_INC4; 
-
-  HAL_DMA_Init(&hdma_rx);
-
-  /* Associate the initialized DMA handle to the the UART handle */
-  __HAL_LINKDMA(&UartCom, hdmarx, hdma_rx);
-
-  /*##-4- Configure the NVIC for DMA #########################################*/
-  /* NVIC configuration for DMA transfer complete interrupt (USART_COM_TX) */
-  HAL_NVIC_SetPriority(USART_COM_DMA_TX_IRQn, 0, 1);
-  HAL_NVIC_EnableIRQ(USART_COM_DMA_TX_IRQn);
-
-  /* NVIC configuration for DMA transfer complete interrupt (USART_COM_RX) */
-  HAL_NVIC_SetPriority(USART_COM_DMA_RX_IRQn, 0, 0);   
-  HAL_NVIC_EnableIRQ(USART_COM_DMA_RX_IRQn);
-
-  /* NVIC configuration for USART TC interrupt */
-  HAL_NVIC_SetPriority(USART_COM_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(USART_COM_IRQn);
 
   if(HAL_UART_Init(&UartCom) != HAL_OK)
   {
@@ -389,16 +316,6 @@ void BSP_COM_DeInit(void)
   HAL_GPIO_DeInit(USART_COM_TX_GPIO_PORT, USART_COM_TX_PIN);
   /* Configure UART Rx as alternate function  */
   HAL_GPIO_DeInit(USART_COM_RX_GPIO_PORT, USART_COM_RX_PIN);
-
-  /*##-3- Disable the DMA Streams ############################################*/
-  /* De-Initialize the DMA Stream associate to transmission process */
-  HAL_DMA_DeInit(&hdma_tx); 
-  /* De-Initialize the DMA Stream associate to reception process */
-  HAL_DMA_DeInit(&hdma_rx);
-
-  /*##-4- Disable the NVIC for DMA ###########################################*/
-  HAL_NVIC_DisableIRQ(USART_COM_DMA_TX_IRQn);
-  HAL_NVIC_DisableIRQ(USART_COM_DMA_RX_IRQn);
 }
 
 int BSP_COM_Write(const uint8_t* data_out, uint32_t size)
@@ -408,124 +325,18 @@ int BSP_COM_Write(const uint8_t* data_out, uint32_t size)
   return 0;
 }
 
-#if 0
-int BSP_COM_Read(uint8_t* data_in, uint32_t expected_data_size, uint32_t timeout_ms)
+int BSP_COM_Read(uint8_t* data_in, uint16_t expected_data_size, uint32_t timeout_ms)
 {
-    uint8_t* available_data2;
-    uint32_t bytes_available2;
+  HAL_StatusTypeDef rx_status;
 
-    while (expected_data_size != 0)
-    {
-        uint32_t transfer_size = MIN(UartComInterface.rx_buffer->size / 2, expected_data_size);
+  rx_status = HAL_UART_Receive(&UartCom, data_in, expected_data_size, timeout_ms);
 
-        /* Check if ring buffer already contains the required amount of data. */
-        if ( transfer_size > ring_buffer_used_space( UartComInterface.rx_buffer ) )
-        {
-            /* Set rx_size and wait in rx_complete semaphore until data reaches rx_size or timeout occurs */
-            UartComInterface.rx_size = transfer_size;
-
-            if ( host_rtos_get_semaphore( &UartComInterface.rx_complete, timeout_ms, true ) != 0 )
-            {
-                UartComInterface.rx_size = 0;
-#if 1
-                ring_buffer_get_data( UartComInterface.rx_buffer, &available_data2, &bytes_available2 );
-
-                while ( bytes_available2 > 0 )
-                {
-                    bytes_available2 = MIN( bytes_available2, transfer_size );
-                    memcpy( data_in, available_data2, bytes_available2 );
-                    data_in = ( (uint8_t*) data_in + bytes_available2 );
-                    ring_buffer_consume( UartComInterface.rx_buffer, bytes_available2 );
-                    ring_buffer_get_data( UartComInterface.rx_buffer, &available_data2, &bytes_available2 );
-                }
-
-#endif
-                return -2;
-            }
-
-            /* Reset rx_size to prevent semaphore being set while nothing waits for the data */
-            UartComInterface.rx_size = 0;
-        }
-
-        expected_data_size -= transfer_size;
-
-        // Grab data from the buffer
-        do
-        {
-            uint8_t* available_data;
-            uint32_t bytes_available;
-
-            ring_buffer_get_data( UartComInterface.rx_buffer, &available_data, &bytes_available );
-            bytes_available = MIN( bytes_available, transfer_size );
-            memcpy( data_in, available_data, bytes_available );
-            transfer_size -= bytes_available;
-            data_in = ( (uint8_t*) data_in + bytes_available );
-            ring_buffer_consume( UartComInterface.rx_buffer, bytes_available );
-        }
-        while ( transfer_size != 0 );
-    }
-
-    if ( expected_data_size != 0 )
-    {
-        return -1;
-    }
-    else
-    {
-        return 0;
-    }
+  return (int)rx_status;
 }
-#endif
+
 void BSP_UART_Init(void)
 {
   BSP_STDIO_Init();
   BSP_COM_Init();
 }
 
-#if 1
-/**
-  * @brief  Tx Transfer completed callback
-  * @param  UartHandle: UART handle. 
-  * @note   This example shows a simple way to report end of DMA Tx transfer, and 
-  *         you can add your own implementation. 
-  * @retval None
-  */
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-  /* Set transmission flag: transfer complete*/
-  //UartReady = SET;
-
-  ///* Turn LED6 on: Transfer in transmission process is correct */
-  //BSP_LED_On(LED6); 
-}
-
-/**
-  * @brief  Rx Transfer completed callback
-  * @param  UartHandle: UART handle
-  * @note   This example shows a simple way to report end of DMA Rx transfer, and 
-  *         you can add your own implementation.
-  * @retval None
-  */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-  /* Set transmission flag: transfer complete*/
-  //UartReady = SET;
-  
-  ///* Turn LED4 on: Transfer in reception process is correct */
-  //BSP_LED_On(LED4);
-}
-
-/**
-  * @brief  UART error callbacks
-  * @param  UartHandle: UART handle
-  * @note   This example shows a simple way to report transfer error, and you can
-  *         add your own implementation.
-  * @retval None
-  */
-void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
-{
-  /* Turn LED2 on: Transfer error in reception/transmission process */
-  BSP_LED_On(LED2);
-  printf("ERROR: UART transfer error\r\n");
-}
-
-#endif

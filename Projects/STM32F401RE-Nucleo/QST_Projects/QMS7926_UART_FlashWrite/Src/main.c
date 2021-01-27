@@ -44,8 +44,9 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "qms7926_flashwrite_uart.h"
+#include "bsp_uart.h"
 #include "version_print.h"
+#include "qms7926_fw_update.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -163,6 +164,9 @@ int main(void)
 
   /* Log version info */
   PrintVersion();
+
+  /* Perform QMS7926 firmare update */
+  qms7926_fw_update();
 
   /* Infinite loop */
   while (1)
