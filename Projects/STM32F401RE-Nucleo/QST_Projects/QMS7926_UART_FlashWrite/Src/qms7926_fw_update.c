@@ -144,7 +144,7 @@ static int qms7926_write_flash(const uint8_t bin_file_num)
   const char *p_chksum;
   const uint8_t *p_bin;
   uint16_t cpbin_cmd_len = 0, chksum_len = 0;
-  uint32_t bin_size = 0;
+  volatile uint32_t bin_size = 0;
   const char expected_rsp[] = "checksum is: 0xXXXXXXXX";
   int ret;
 
