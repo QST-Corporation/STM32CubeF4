@@ -1951,6 +1951,6 @@ const uint32_t bin2_char_len = 30632;
 
 const char bin2_cpbin_cmd[] = "cpbin c1 010000 77a8 00010000";
 
-const char bin1_chksum[] = "4ae";
-const char bin2_chksum[] = "2b24c9";
+const char bin1_chksum[] = "000004ae";
+const char bin2_chksum[] = "002b24c9";
 const uint8_t bin_total_num = 2;

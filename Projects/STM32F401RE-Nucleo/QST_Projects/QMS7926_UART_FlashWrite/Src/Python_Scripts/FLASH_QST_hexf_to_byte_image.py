@@ -45,11 +45,11 @@ def hex2str(hex_file_name,h_file_name):
                        if bin_num == 2:
                             write_str(str_buf1, 1, addr_start)
                             bin1_chksum = reduce(lambda x,y:x+y,bin_buf1[:])
-                            bin_info = "const char bin1_chksum[] = \"%x"%bin1_chksum + "\";\n"
+                            bin_info = "const char bin1_chksum[] = \"%08x"%bin1_chksum + "\";\n"
                        elif bin_num == 3:
                             write_str(str_buf2, 2, addr_start)
                             bin2_chksum = reduce(lambda x,y:x+y,bin_buf2[:])
-                            bin_info += "const char bin2_chksum[] = \"%x"%bin2_chksum + "\";\n"
+                            bin_info += "const char bin2_chksum[] = \"%08x"%bin2_chksum + "\";\n"
                    else:
                        print('checksum failed!'+str(list(map(hex,line))))
                 elif (line[7:9] == '00'):          #Data Record
@@ -101,15 +101,15 @@ def hex2str(hex_file_name,h_file_name):
                         if bin_num == 1:
                             write_str(str_buf1, 1, addr_start)
                             bin1_chksum = reduce(lambda x,y:x+y,bin_buf1[:])
-                            bin_info = "const char bin1_chksum[] = \"%x"%bin1_chksum + "\";\n"
+                            bin_info = "const char bin1_chksum[] = \"%08x"%bin1_chksum + "\";\n"
                         elif bin_num == 2:
                             write_str(str_buf2, 2, addr_start)
                             bin2_chksum = reduce(lambda x,y:x+y,bin_buf2[:])
-                            bin_info += "const char bin2_chksum[] = \"%x"%bin2_chksum + "\";\n"
+                            bin_info += "const char bin2_chksum[] = \"%08x"%bin2_chksum + "\";\n"
                         elif bin_num == 3:
                             write_str(str_buf3, 3, addr_start)
                             bin3_chksum = reduce(lambda x,y:x+y,bin_buf3[:])
-                            bin_info += "const char bin3_chksum[] = \"%x"%bin3_chksum + "\";\n"
+                            bin_info += "const char bin3_chksum[] = \"%08x"%bin3_chksum + "\";\n"
                         bin_info += "const uint8_t bin_total_num = %d"%bin_num + ";\n"
                         imageFile.write(bin_info)
                     else:
