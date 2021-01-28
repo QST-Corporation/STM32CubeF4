@@ -6,8 +6,18 @@
 # Author : QST AE team
 
 import os
+import stat
 import time
 from functools import reduce
+from shutil import copyfile
+
+
+bin_buf1 = []# raw data of binary is to be stored here
+bin_buf2 = []
+bin_buf3 = []
+str_buf1 = []
+str_buf2 = []
+str_buf3 = []
 
 # get '.hexf' file name from current path
 def getFileNamebyEX(path):
@@ -19,24 +29,23 @@ def getFileNamebyEX(path):
             print(" *Hexf file : " + filename + extname+'*')
             return i
 
-bin_buf1 = []# raw data of binary is to be stored here
-bin_buf2 = []
-bin_buf3 = []
-str_buf1 = []
-str_buf2 = []
-str_buf3 = []
-
 def hex2str(hex_file_name,h_file_name):
     with open(hex_file_name,'r') as frd:
         print(' *Hexf file : \''+hex_file_name+'\''+' is opened*')
         byte_num = 0
         bin_num = 0
+        addr_end = 0
+        addr_start = 0
         for line in frd.readlines():
             if(line[0] == ':'):
                 if(line[7:9] == '04'):               #Extended Linear Address Record
                    #print('Extended Linear Address Record');
                    line = char2hex(line)
                    if checksum(line) == 0:         #checksum passed
+                       if bin_num > 0:
+                            print(' *Addr_start: 0x%08X' %addr_start)
+                            print(' *Addr_end  : 0x%08X' %addr_end)
+                            print(' *Size : %d Bytes' %byte_num)
                        addr_h = (line[4]<<24) +(line[5]<<16)
                        byte_num = 0
                        bin_num += 1
@@ -59,6 +68,8 @@ def hex2str(hex_file_name,h_file_name):
                         addr_l = (line[1]<<8) + line[2]
                         LL = line[0]
                         byte_num = byte_num + LL
+                        addr_end = addr_h + addr_l + LL - 1
+                        addr_start = addr_end + 1 - byte_num
                         #print('byte_num %d' %byte_num)
                         for data in strline[:]: #for data in line[4:-1]:
                             if bin_num == 1:
@@ -75,18 +86,10 @@ def hex2str(hex_file_name,h_file_name):
                                 bin_buf2.append(hex)
                             if bin_num == 3:
                                 bin_buf3.append(hex)
-                        if LL!=0x10: #if LL!=0x10:
-                            addr_end = addr_h + addr_l + LL - 1
-                            addr_start = addr_end + 1 - byte_num
-                            print(' *Addr_start: 0x%08X' %addr_start)
-                            print(' *Addr_end  : 0x%08X' %addr_end)
-                            print(' *Size : %d Bytes' %byte_num)
-                        else: 
-                            pass
                     else:
                         print('checksum failed!'+str(list(map(hex,line))))
                 elif(line[7:9] == '05'):
-                    #print('Extended Segment Address Record');
+                    print('Extended Segment Address Record');
                     line = char2hex(line)
                     if checksum(line) == 0:    pass
                     else:
@@ -95,6 +98,9 @@ def hex2str(hex_file_name,h_file_name):
                     #print('End of FileRecord');
                     line = char2hex(line)
                     if checksum(line) == 0:
+                        print(' *Addr_start: 0x%08X' %addr_start)
+                        print(' *Addr_end  : 0x%08X' %addr_end)
+                        print(' *Size : %d Bytes' %byte_num)
                         print(" ------------------------------")
                         print(' *Hexf file successed resolved*')
                         print(' *Total bin files : %d ' %bin_num)
@@ -195,6 +201,8 @@ imageFile = open(h_file_name, "w")
 imageFile.write(image_comment)
 hex2str(hex_file_name,h_file_name)
 imageFile.close()
+target_dir = '../image/'
+copyfile('./' + h_file_name, target_dir+'image.h')
 endtime = time.perf_counter()
   
 print(' *Time elapsed:' + str(endtime-starttime))
