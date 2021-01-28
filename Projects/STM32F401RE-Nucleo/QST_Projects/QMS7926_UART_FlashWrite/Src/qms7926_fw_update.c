@@ -127,7 +127,7 @@ static int qms7926_uart_flash_cmd(const char *pcmd, uint16_t cmdLen, const char 
 
   BSP_COM_Write((const uint8_t*)pcmd, cmdLen);
   BSP_COM_Read(rxStr, expected_rsp_len, QMS7926_UART_TIMEOUT_MS);
-  printf("Rsp:[%s],expected:[%s],expected_len:%d\n", rxStr, expected_rsp, expected_rsp_len);
+  //printf("Rsp:[%s],expected:[%s],expected_len:%d\n", rxStr, expected_rsp, expected_rsp_len);
 
   if (buffercmp(rxStr, (uint8_t *)expected_rsp, expected_rsp_len) != 0) {
     return -1;
@@ -138,17 +138,18 @@ static int qms7926_uart_flash_cmd(const char *pcmd, uint16_t cmdLen, const char 
 static int qms7926_write_flash(const uint8_t bin_file_num)
 {
   uint8_t rxStr[50] = {0x00,};
-  uint8_t fragment_len = 0, i;
+  uint8_t fragment_len = 0;
+  volatile uint8_t bin_index;
   const char *p_cpbin_cmd;
   const char *p_chksum;
   const uint8_t *p_bin;
   uint16_t cpbin_cmd_len = 0, chksum_len = 0;
   uint32_t bin_size = 0;
-  const char expected_rsp[] = "checksum is: 0xXXXXXXXX ";
+  const char expected_rsp[] = "checksum is: 0xXXXXXXXX";
   int ret;
 
-  for (i=0; i<bin_file_num; i++) {
-    if (i == 0) {
+  for (bin_index=1; bin_index<bin_file_num+1; ) {
+    if (bin_index == 1) {
       p_cpbin_cmd = bin1_cpbin_cmd;
       cpbin_cmd_len = strlen(bin1_cpbin_cmd);
       p_chksum = bin1_chksum;
@@ -156,7 +157,7 @@ static int qms7926_write_flash(const uint8_t bin_file_num)
       p_bin = bin1;
       bin_size = bin1_char_len;
     }
-    else if (i == 1) {
+    else if (bin_index == 2) {
       p_cpbin_cmd = bin2_cpbin_cmd;
       cpbin_cmd_len = strlen(bin2_cpbin_cmd);
       p_chksum = bin2_chksum;
@@ -164,7 +165,7 @@ static int qms7926_write_flash(const uint8_t bin_file_num)
       p_bin = bin2;
       bin_size = bin2_char_len;
     }
-    else if (i == 2) {
+    else if (bin_index == 3) {
       p_cpbin_cmd = bin3_cpbin_cmd;
       cpbin_cmd_len = strlen(bin3_cpbin_cmd);
       p_chksum = bin3_chksum;
@@ -196,7 +197,7 @@ static int qms7926_write_flash(const uint8_t bin_file_num)
       p_bin += fragment_len;
       bin_size -= fragment_len;
     }
-    ret = BSP_COM_Read(rxStr, strlen(expected_rsp), QMS7926_UART_TIMEOUT_MS*2);
+    ret = BSP_COM_Read(rxStr, strlen(expected_rsp), QMS7926_UART_TIMEOUT_MS);
     printf("Rx[%s]: %d\n", rxStr, ret);
     if (ret != SUCCESS) {
       return ret;
@@ -208,6 +209,9 @@ static int qms7926_write_flash(const uint8_t bin_file_num)
     if (ret != SUCCESS) {
       return ret;
     }
+
+    printf("Finished download file bin%d/%d\n", bin_index, bin_file_num);
+    bin_index += 1;
   }
 
   return SUCCESS;
