@@ -15,9 +15,15 @@ from shutil import copyfile
 bin_buf1 = []# raw data of binary is to be stored here
 bin_buf2 = []
 bin_buf3 = []
+bin_buf4 = []
+bin_buf5 = []
+bin_buf6 = []
 str_buf1 = []
 str_buf2 = []
 str_buf3 = []
+str_buf4 = []
+str_buf5 = []
+str_buf6 = []
 
 # get '.hexf' file name from current path
 def getFileNamebyEX(path):
@@ -59,6 +65,22 @@ def hex2str(hex_file_name,h_file_name):
                             write_str(str_buf2, 2, addr_start)
                             bin2_chksum = reduce(lambda x,y:x+y,bin_buf2[:])
                             bin_info += "const char bin2_chksum[] = \"%08x"%bin2_chksum + "\";\n"
+                       elif bin_num == 4:
+                            write_str(str_buf3, 3, addr_start)
+                            bin3_chksum = reduce(lambda x,y:x+y,bin_buf3[:])
+                            bin_info += "const char bin3_chksum[] = \"%08x"%bin3_chksum + "\";\n"
+                       elif bin_num == 5:
+                            write_str(str_buf4, 4, addr_start)
+                            bin4_chksum = reduce(lambda x,y:x+y,bin_buf4[:])
+                            bin_info += "const char bin4_chksum[] = \"%08x"%bin4_chksum + "\";\n"
+                       elif bin_num == 6:
+                            write_str(str_buf5, 5, addr_start)
+                            bin5_chksum = reduce(lambda x,y:x+y,bin_buf5[:])
+                            bin_info += "const char bin5_chksum[] = \"%08x"%bin5_chksum + "\";\n"
+                       elif bin_num == 7:
+                            write_str(str_buf6, 6, addr_start)
+                            bin6_chksum = reduce(lambda x,y:x+y,bin_buf6[:])
+                            bin_info += "const char bin6_chksum[] = \"%08x"%bin6_chksum + "\";\n"
                    else:
                        print('checksum failed!'+str(list(map(hex,line))))
                 elif (line[7:9] == '00'):          #Data Record
@@ -78,6 +100,12 @@ def hex2str(hex_file_name,h_file_name):
                                 str_buf2.append(data)
                             elif bin_num == 3:
                                 str_buf3.append(data)
+                            elif bin_num == 4:
+                                str_buf4.append(data)
+                            elif bin_num == 5:
+                                str_buf5.append(data)
+                            elif bin_num == 6:
+                                str_buf6.append(data)
                             #print('str_buf:'+str(list(map(hex,str_buf))))
                         for hex in line[4:-1]:
                             if bin_num == 1:
@@ -86,6 +114,12 @@ def hex2str(hex_file_name,h_file_name):
                                 bin_buf2.append(hex)
                             if bin_num == 3:
                                 bin_buf3.append(hex)
+                            if bin_num == 4:
+                                bin_buf4.append(hex)
+                            if bin_num == 5:
+                                bin_buf5.append(hex)
+                            if bin_num == 6:
+                                bin_buf6.append(hex)
                     else:
                         print('checksum failed!'+str(list(map(hex,line))))
                 elif(line[7:9] == '05'):
@@ -116,6 +150,18 @@ def hex2str(hex_file_name,h_file_name):
                             write_str(str_buf3, 3, addr_start)
                             bin3_chksum = reduce(lambda x,y:x+y,bin_buf3[:])
                             bin_info += "const char bin3_chksum[] = \"%08x"%bin3_chksum + "\";\n"
+                        elif bin_num == 4:
+                            write_str(str_buf4, 4, addr_start)
+                            bin4_chksum = reduce(lambda x,y:x+y,bin_buf4[:])
+                            bin_info += "const char bin4_chksum[] = \"%08x"%bin4_chksum + "\";\n"
+                        elif bin_num == 5:
+                            write_str(str_buf5, 5, addr_start)
+                            bin5_chksum = reduce(lambda x,y:x+y,bin_buf5[:])
+                            bin_info += "const char bin5_chksum[] = \"%08x"%bin5_chksum + "\";\n"
+                        elif bin_num == 6:
+                            write_str(str_buf6, 6, addr_start)
+                            bin6_chksum = reduce(lambda x,y:x+y,bin_buf6[:])
+                            bin_info += "const char bin6_chksum[] = \"%08x"%bin6_chksum + "\";\n"
                         bin_info += "const uint8_t bin_total_num = %d"%bin_num + ";\n"
                         imageFile.write(bin_info)
                     else:
@@ -133,15 +179,27 @@ image_comment = ("/*"
                 + "\n__weak const char bin1_cpbin_cmd[];"
                 + "\n__weak const char bin2_cpbin_cmd[];"
                 + "\n__weak const char bin3_cpbin_cmd[];"
+                + "\n__weak const char bin4_cpbin_cmd[];"
+                + "\n__weak const char bin5_cpbin_cmd[];"
+                + "\n__weak const char bin6_cpbin_cmd[];"
                 + "\n__weak const char bin1_chksum[];"
                 + "\n__weak const char bin2_chksum[];"
                 + "\n__weak const char bin3_chksum[];"
+                + "\n__weak const char bin4_chksum[];"
+                + "\n__weak const char bin5_chksum[];"
+                + "\n__weak const char bin6_chksum[];"
                 + "\n__weak const uint8_t bin1[];"
                 + "\n__weak const uint8_t bin2[];"
                 + "\n__weak const uint8_t bin3[];"
+                + "\n__weak const uint8_t bin4[];"
+                + "\n__weak const uint8_t bin5[];"
+                + "\n__weak const uint8_t bin6[];"
                 + "\n__weak const uint32_t bin1_char_len;"
                 + "\n__weak const uint32_t bin2_char_len;"
-                + "\n__weak const uint32_t bin3_char_len;\n")
+                + "\n__weak const uint32_t bin3_char_len;"
+                + "\n__weak const uint32_t bin4_char_len;"
+                + "\n__weak const uint32_t bin5_char_len;"
+                + "\n__weak const uint32_t bin6_char_len;\n")
 
 # write data in str_buf to '*.h' file
 def write_str(str_buf, bin_index, address):
@@ -166,6 +224,18 @@ def write_str(str_buf, bin_index, address):
         eprom_begin += "\nconst uint8_t bin3[] ={\n"
         eprom_end += "\nconst uint32_t bin3_char_len = %d"%(bin_size) + ";\n"
         eprom_end += "\nconst char bin3_cpbin_cmd[] = \"cpbin c2 " + cpbin_cmd_payload + "\";\n"
+    elif bin_index == 4:
+        eprom_begin += "\nconst uint8_t bin4[] ={\n"
+        eprom_end += "\nconst uint32_t bin4_char_len = %d"%(bin_size) + ";\n"
+        eprom_end += "\nconst char bin4_cpbin_cmd[] = \"cpbin c3 " + cpbin_cmd_payload + "\";\n"
+    elif bin_index == 5:
+        eprom_begin += "\nconst uint8_t bin5[] ={\n"
+        eprom_end += "\nconst uint32_t bin5_char_len = %d"%(bin_size) + ";\n"
+        eprom_end += "\nconst char bin5_cpbin_cmd[] = \"cpbin c4 " + cpbin_cmd_payload + "\";\n"
+    elif bin_index == 6:
+        eprom_begin += "\nconst uint8_t bin6[] ={\n"
+        eprom_end += "\nconst uint32_t bin6_char_len = %d"%(bin_size) + ";\n"
+        eprom_end += "\nconst char bin6_cpbin_cmd[] = \"cpbin c5 " + cpbin_cmd_payload + "\";\n"
     imageFile.write("\n" + eprom_begin + eprom_content + eprom_end + "\n")
 
 #one line string to hex-8 list,except ':' and CR
