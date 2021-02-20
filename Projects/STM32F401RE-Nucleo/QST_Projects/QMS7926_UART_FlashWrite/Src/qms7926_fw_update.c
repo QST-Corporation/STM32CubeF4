@@ -173,6 +173,30 @@ static int qms7926_write_flash(const uint8_t bin_file_num)
       p_bin = bin3;
       bin_size = bin3_char_len;
     }
+    else if (bin_index == 4) {
+      p_cpbin_cmd = bin4_cpbin_cmd;
+      cpbin_cmd_len = strlen(bin4_cpbin_cmd);
+      p_chksum = bin4_chksum;
+      chksum_len = strlen(bin4_chksum);
+      p_bin = bin4;
+      bin_size = bin4_char_len;
+    }
+    else if (bin_index == 5) {
+      p_cpbin_cmd = bin5_cpbin_cmd;
+      cpbin_cmd_len = strlen(bin5_cpbin_cmd);
+      p_chksum = bin5_chksum;
+      chksum_len = strlen(bin5_chksum);
+      p_bin = bin5;
+      bin_size = bin5_char_len;
+    }
+    else if (bin_index == 6) {
+      p_cpbin_cmd = bin6_cpbin_cmd;
+      cpbin_cmd_len = strlen(bin6_cpbin_cmd);
+      p_chksum = bin6_chksum;
+      chksum_len = strlen(bin6_chksum);
+      p_bin = bin6;
+      bin_size = bin6_char_len;
+    }
     else {
       return -1;
     }
