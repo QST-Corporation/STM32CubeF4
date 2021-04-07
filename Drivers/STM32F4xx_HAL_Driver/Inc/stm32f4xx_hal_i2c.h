@@ -85,7 +85,7 @@ typedef struct
   *             01 : Abort (Abort user request on going)
   *             10 : Timeout
   *             11 : Error
-  *          b5     Peripheral initialization status
+  *          b5     Peripheral initilisation status
   *             0  : Reset (Peripheral not initialized)
   *             1  : Init done (Peripheral initialized and ready to use. HAL I2C Init function called)
   *          b4     (not used)
@@ -631,6 +631,8 @@ void HAL_I2C_AbortCpltCallback(I2C_HandleTypeDef *hi2c);
 HAL_I2C_StateTypeDef HAL_I2C_GetState(I2C_HandleTypeDef *hi2c);
 HAL_I2C_ModeTypeDef HAL_I2C_GetMode(I2C_HandleTypeDef *hi2c);
 uint32_t HAL_I2C_GetError(I2C_HandleTypeDef *hi2c);
+HAL_StatusTypeDef HAL_I2C_Mem_Read_2(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
+HAL_StatusTypeDef HAL_I2C_Mem_Write_2(I2C_HandleTypeDef *hi2c, uint16_t DevAddress, uint8_t *pData, uint16_t Size, uint32_t Timeout);
 
 /**
   * @}
