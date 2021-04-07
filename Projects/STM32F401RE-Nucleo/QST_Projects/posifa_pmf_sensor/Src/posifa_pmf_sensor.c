@@ -54,11 +54,14 @@
  *                      Macros
  ******************************************************/
 //#define __weak __attribute__((weak))
-#define ADDR_PSF			0x50
-#define ADDR_PSF_READ		((ADDR_PSF<<1)|1)
-#define ADDR_PSF_WRITE		((ADDR_PSF<<1)|0)	 
-/* USER CODE END Includes */
-#define PSF_TIMEOUT 0xFF
+#define ADDR_PSF                      0x50
+#define ADDR_PSF_READ                 ((ADDR_PSF<<1)|1)
+#define ADDR_PSF_WRITE                ((ADDR_PSF<<1)|0)	 
+#define PSF_TIMEOUT                   0xFF
+#define PSF_ZERO_FLOW                 256
+#define PSF_FULL_SCALE                16124
+//#define PMF4108_FULL_FLOW_RATE            50 //PMF4100
+#define PMF2108_FULL_FLOW_RATE            10 //PMF2108
 
 extern void Error_Handler(void);
 
@@ -164,7 +167,7 @@ uint8_t PMF_read_calibrated(uint16_t *CalibratedFlow)
 	uint8_t checksum = 0;
 
 	error = PSF_I2C_Read(i2c_buf, 5);
-  //printf("PSF_I2C_Read:%d\n", error);
+  //printf("PSF_I2C_Read(%d):[0x%02X,0x%02X,0x%02X,0x%02X,0x%02X]\n", error,i2c_buf[0],i2c_buf[1],i2c_buf[2],i2c_buf[3],i2c_buf[4]);
 	checksum = i2c_buf[1]+ i2c_buf[2]+ i2c_buf[3]+ i2c_buf[4];
 	checksum = ~checksum;
 	checksum += 1;
@@ -181,11 +184,14 @@ uint8_t PMF_read_calibrated(uint16_t *CalibratedFlow)
 	return error;
 }
 
-
 void PMF_Sensor_Test(void)
 {
     uint8_t ret=0xff;
+    float flowRate = 0;
     uint16_t result;
     ret = PMF_read_calibrated(&result);
-    printf("Read calibrated: %d(status %d)\r\n", result, ret);
+    flowRate = (result - PSF_ZERO_FLOW)/(float)(PSF_FULL_SCALE - PSF_ZERO_FLOW)*PMF2108_FULL_FLOW_RATE;
+    //printf("Calibrated(status %d): %d, flowRate:%f\n", ret, result, flowRate); //sprintf(&strBuf[0], "%.4lf", data);
+    printf("%d, %f\n", result, flowRate);
+    //printf("Calibrated(status %d): %d\r\n", ret, result);
 }

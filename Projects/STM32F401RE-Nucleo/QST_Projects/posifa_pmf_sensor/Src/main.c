@@ -170,11 +170,11 @@ int main(void)
   /* Perform I2C initialization for Posifa PMF sensor*/
   MX_I2C1_Init();
 
-  PMF_Sensor_Test();
   /* Infinite loop */
   while (1)
   {
-
+    PMF_Sensor_Test();
+    HAL_Delay(100);
   }
 }
 
