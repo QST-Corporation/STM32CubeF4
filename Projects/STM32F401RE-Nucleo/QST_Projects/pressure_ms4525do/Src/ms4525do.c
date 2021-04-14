@@ -184,6 +184,7 @@ void MS4525DO_Sensor_Test(void)
   ms_status_t status = MS_FAULT;
   uint8_t databuf[4] = {0x00};
   int16_t bridge = 0, temperature = 0;
+  float temp_degree = 0;
 
   ret = MS4525DO_data_read(databuf);
   if (ret  == HAL_OK) {
@@ -191,5 +192,8 @@ void MS4525DO_Sensor_Test(void)
     bridge = ((int16_t)databuf[0] << 8) | (databuf[1]);
     status = (ms_status_t)(databuf[0] >> 5);
   }
-  printf("MS4525DO(status %d) bridge: %d, temperature: %d\n\n", status, bridge, temperature);
+
+  temp_degree = (float)temperature*200/2047 - 50;
+
+  printf("MS4525DO(status %d) bridge: %d, temperature(%d): %.1f℃\n\n", status, bridge, temperature, temp_degree);
 }
