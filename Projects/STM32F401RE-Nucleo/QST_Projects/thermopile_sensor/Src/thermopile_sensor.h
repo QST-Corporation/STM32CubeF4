@@ -73,8 +73,7 @@ extern "C"
 /******************************************************
  *             Function Declarations
  ******************************************************/
-void MX_I2C1_Init(void);
-uint8_t Thermo_Sensor_Check_Chipid(void);
+void Thermo_Sensor_Init(void);
 void Thermo_Sensor_Test(void);
 
 #ifdef __cplusplus

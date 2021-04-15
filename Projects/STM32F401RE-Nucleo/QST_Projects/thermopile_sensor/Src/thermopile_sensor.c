@@ -60,6 +60,10 @@
 //#define THERMO_READ_CMD               0x01
 #define THERMO_DATE_ID_REG            0x00
 #define THERMO_CHIP_ID_REG            0x01
+#define THERMO_CALI_1_T_REG           0x20
+#define THERMO_CALI_1_S_REG           0x22
+#define THERMO_CALI_3_S_REG           0x30
+#define THERMO_CALI_DATA_NUM          8
 #define THERMO_RAW_DATA_REG           0xA2 //raw_data
 #define THERMO_TEMPERATURE_REG        0xA6 //temperature
 #define THERMO_TIMEOUT                0xFF
@@ -167,6 +171,58 @@ HAL_StatusTypeDef Thermo_I2C_Write(uint8_t *pData, uint16_t size)
   return Status;
 }
 
+uint8_t Thermo_read_calibration(uint32_t* pCaliData, uint8_t size)
+{
+  uint8_t cmd_buf[3]={0}, cali_high_reg[5]={0}, cali_low_reg[5]={0};
+  uint8_t err = HAL_ERROR;
+  uint16_t cali_high=0, cali_low=0;
+  uint32_t calibration[THERMO_CALI_DATA_NUM] = {0};
+
+  if((pCaliData == NULL) || (size < THERMO_CALI_DATA_NUM))
+  {
+    return HAL_ERROR;
+  }
+
+  //printf("Calibration data:");
+  for (uint8_t i=0; i<THERMO_CALI_DATA_NUM; i++)
+  {
+    if (i<5) {
+      cmd_buf[0] = THERMO_CALI_1_T_REG + 2*i;
+    } else {
+      cmd_buf[0] = THERMO_CALI_3_S_REG + 2*(i-5);
+    }
+    cmd_buf[1] = 0x00;
+    cmd_buf[2] = 0x00;
+    memset(cali_high_reg, 0x00, sizeof(cali_high_reg));
+    err = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
+    HAL_Delay(200);
+    err = Thermo_I2C_Read(cali_high_reg, 4);
+    printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+            cmd_buf[0],err,cali_high_reg[0],cali_high_reg[1],cali_high_reg[2],cali_high_reg[3]);
+    cali_high = (uint16_t)cali_high_reg[1]<<8 | cali_high_reg[2];
+
+    HAL_Delay(200);
+    cmd_buf[0]++; //MTP_Address + 1
+    memset(cali_low_reg, 0x00, sizeof(cali_low_reg));
+    err = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
+    HAL_Delay(200);
+    err = Thermo_I2C_Read(cali_low_reg, 4);
+    printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+            cmd_buf[0],err,cali_low_reg[0],cali_low_reg[1],cali_low_reg[2],cali_low_reg[3]);
+    cali_low = (uint16_t)cali_low_reg[1]<<8 | cali_low_reg[2];
+
+    calibration[i] = ((uint32_t)cali_high<<3) | (cali_low>>14);
+    //printf("\n[%d] %d, \n", i, calibration[i]);
+    HAL_Delay(200);
+  }
+  //printf("\n");
+  if (err == HAL_OK) {
+    memmove(pCaliData, calibration, size);
+  }
+
+  return err;
+}
+
 uint8_t Thermo_read_data(int32_t *pdata)
 {
   uint8_t cmd_buf[3]={0}, raw_reg[5]={0}, temp_reg[5]={0};
@@ -181,26 +237,29 @@ uint8_t Thermo_read_data(int32_t *pdata)
   cmd_buf[0] = THERMO_RAW_DATA_REG;
   cmd_buf[1] = 0x00;
   cmd_buf[2] = 0x00;
+  HAL_Delay(200);
   err = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
   //printf("Thermo_I2C_Write(RAW):%d\n", err);
-
+  HAL_Delay(200);
   err = Thermo_I2C_Read(raw_reg, 4);
   raw = (int32_t)raw_reg[1]<<16 | raw_reg[2]<<8 | raw_reg[3];
   printf("Thermo_I2C_Read_Raw(%d):0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
           err, raw_reg[0], raw_reg[1], raw_reg[2], raw_reg[3]);
   printf("raw:%ld\n", raw);
 
+  HAL_Delay(200);
   cmd_buf[0] = THERMO_TEMPERATURE_REG;
   cmd_buf[1] = 0x00;
   cmd_buf[2] = 0x00;
   err = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
   //printf("Thermo_I2C_Write(TEMP):%d\n", err);
-
+  HAL_Delay(200);
   err = Thermo_I2C_Read(temp_reg, 4);
   temp = (int32_t)temp_reg[1]<<16 | temp_reg[2]<<8 | temp_reg[3];
   printf("Thermo_I2C_Read_Temp(%d):0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
           err, temp_reg[0], temp_reg[1], temp_reg[2], temp_reg[3]);
   printf("temperature:%ld\n", temp);
+  HAL_Delay(200);
 
   return err;
 }
@@ -209,17 +268,26 @@ uint8_t Thermo_Sensor_Check_Chipid(void)
 {
   uint8_t ret = HAL_ERROR;
   uint8_t cmd_buf[3]={0};
-  uint8_t date_reg[3], pid_reg[3], years, months;
+  uint8_t date_reg[4], pid_reg[4], years, months;
   uint32_t pid;
 
   cmd_buf[0] = THERMO_DATE_ID_REG;
   cmd_buf[1] = 0x00;
   cmd_buf[2] = 0x00;
+  HAL_Delay(200);
   ret = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
-  ret = Thermo_I2C_Read(date_reg, 3);
+  HAL_Delay(200);
+  ret = Thermo_I2C_Read(date_reg, 4);
+  printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+          cmd_buf[0],ret,date_reg[0],date_reg[1],date_reg[2],date_reg[3]);
+
+  HAL_Delay(200);
   cmd_buf[0] = THERMO_CHIP_ID_REG;
   ret = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
-  ret = Thermo_I2C_Read(pid_reg, 3);
+  HAL_Delay(200);
+  ret = Thermo_I2C_Read(pid_reg, 4);
+  printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+          cmd_buf[0],ret,pid_reg[0],pid_reg[1],pid_reg[2],pid_reg[3]);
   pid = (((uint32_t)date_reg[1]&0x07)<<16) | (pid_reg[2]<<8) | pid_reg[1];
   months = ((date_reg[2]&0x01)<<5) | (date_reg[1] >> 3);
   years = date_reg[2] >> 1;
@@ -227,8 +295,24 @@ uint8_t Thermo_Sensor_Check_Chipid(void)
   printf("Years: %d, Months: %d, ChipID:0x%06X\n", years, months, pid);
   //years = date_reg[2]<<9;
   //printf("Years: %d\n", years);
+  HAL_Delay(200);
 
   return ret;
+}
+
+void Thermo_Sensor_Init(void)
+{
+  uint32_t calibration[THERMO_CALI_DATA_NUM] = {0};
+  MX_I2C1_Init();
+  HAL_Delay(200);
+  Thermo_Sensor_Check_Chipid();
+  Thermo_read_calibration(calibration, sizeof(calibration));
+  printf("calibration:");
+  for(uint8_t i=0; i<THERMO_CALI_DATA_NUM; i++)
+  {
+    printf("%d,", calibration[i]);
+  }
+  printf("\n");
 }
 
 void Thermo_Sensor_Test(void)

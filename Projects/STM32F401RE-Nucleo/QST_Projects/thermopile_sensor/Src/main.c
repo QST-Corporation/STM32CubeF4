@@ -168,8 +168,7 @@ int main(void)
   PrintVersion();
 
   /* Perform I2C initialization for thermopile sensor*/
-  MX_I2C1_Init();
-  Thermo_Sensor_Check_Chipid();
+  Thermo_Sensor_Init();
 
   /* Infinite loop */
   while (1)
