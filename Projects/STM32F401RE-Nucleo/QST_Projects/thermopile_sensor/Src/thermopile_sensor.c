@@ -197,7 +197,7 @@ uint8_t Thermo_read_calibration(uint32_t* pCaliData, uint8_t size)
     err = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
     HAL_Delay(200);
     err = Thermo_I2C_Read(cali_high_reg, 4);
-    printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+    printf("Reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
             cmd_buf[0],err,cali_high_reg[0],cali_high_reg[1],cali_high_reg[2],cali_high_reg[3]);
     cali_high = (uint16_t)cali_high_reg[1]<<8 | cali_high_reg[2];
 
@@ -207,7 +207,7 @@ uint8_t Thermo_read_calibration(uint32_t* pCaliData, uint8_t size)
     err = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
     HAL_Delay(200);
     err = Thermo_I2C_Read(cali_low_reg, 4);
-    printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+    printf("Reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
             cmd_buf[0],err,cali_low_reg[0],cali_low_reg[1],cali_low_reg[2],cali_low_reg[3]);
     cali_low = (uint16_t)cali_low_reg[1]<<8 | cali_low_reg[2];
 
@@ -242,10 +242,9 @@ uint8_t Thermo_read_data(int32_t *pdata)
   //printf("Thermo_I2C_Write(RAW):%d\n", err);
   HAL_Delay(200);
   err = Thermo_I2C_Read(raw_reg, 4);
-  raw = (int32_t)raw_reg[1]<<16 | raw_reg[2]<<8 | raw_reg[3];
-  printf("Thermo_I2C_Read_Raw(%d):0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
-          err, raw_reg[0], raw_reg[1], raw_reg[2], raw_reg[3]);
-  printf("raw:%ld\n", raw);
+  raw = ((int32_t)raw_reg[1]<<16 | raw_reg[2]<<8 | raw_reg[3])>>6; //S_DATA= A2HEX[23:6]
+  //printf("Thermo_I2C_Read_Raw(%d):0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
+  //        err, raw_reg[0], raw_reg[1], raw_reg[2], raw_reg[3]);
 
   HAL_Delay(200);
   cmd_buf[0] = THERMO_TEMPERATURE_REG;
@@ -255,10 +254,10 @@ uint8_t Thermo_read_data(int32_t *pdata)
   //printf("Thermo_I2C_Write(TEMP):%d\n", err);
   HAL_Delay(200);
   err = Thermo_I2C_Read(temp_reg, 4);
-  temp = (int32_t)temp_reg[1]<<16 | temp_reg[2]<<8 | temp_reg[3];
-  printf("Thermo_I2C_Read_Temp(%d):0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
-          err, temp_reg[0], temp_reg[1], temp_reg[2], temp_reg[3]);
-  printf("temperature:%ld\n", temp);
+  temp = ((int32_t)temp_reg[1]<<16 | temp_reg[2]<<8 | temp_reg[3])>>6; //S_DATA= A6HEX[23:6]
+  //printf("Thermo_I2C_Read_Temp(%d):0x%02X, 0x%02X, 0x%02X, 0x%02X\n",
+  //        err, temp_reg[0], temp_reg[1], temp_reg[2], temp_reg[3]);
+  printf("[raw, temp], %ld, %ld\n", raw, temp);
   HAL_Delay(200);
 
   return err;
@@ -268,7 +267,7 @@ uint8_t Thermo_Sensor_Check_Chipid(void)
 {
   uint8_t ret = HAL_ERROR;
   uint8_t cmd_buf[3]={0};
-  uint8_t date_reg[4], pid_reg[4], years, months;
+  uint8_t date_reg[4]={0}, pid_reg[4]={0}, years, months;
   uint32_t pid;
 
   cmd_buf[0] = THERMO_DATE_ID_REG;
@@ -278,7 +277,7 @@ uint8_t Thermo_Sensor_Check_Chipid(void)
   ret = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
   HAL_Delay(200);
   ret = Thermo_I2C_Read(date_reg, 4);
-  printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+  printf("Reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
           cmd_buf[0],ret,date_reg[0],date_reg[1],date_reg[2],date_reg[3]);
 
   HAL_Delay(200);
@@ -286,15 +285,13 @@ uint8_t Thermo_Sensor_Check_Chipid(void)
   ret = Thermo_I2C_Write(cmd_buf, sizeof(cmd_buf));
   HAL_Delay(200);
   ret = Thermo_I2C_Read(pid_reg, 4);
-  printf("Read reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
+  printf("Reg[0x%02X](%d): 0x%02X,0x%02X,0x%02X,0x%02X\n",
           cmd_buf[0],ret,pid_reg[0],pid_reg[1],pid_reg[2],pid_reg[3]);
   pid = (((uint32_t)date_reg[1]&0x07)<<16) | (pid_reg[2]<<8) | pid_reg[1];
-  months = ((date_reg[2]&0x01)<<5) | (date_reg[1] >> 3);
-  years = date_reg[2] >> 1;
+  months = (((uint16_t)date_reg[2]<<8 | date_reg[1])>>3) & 0x3F; //Months=Bit[8:3]
+  years = date_reg[2] >> 1; //Years=Bit[15:9]
 
   printf("Years: %d, Months: %d, ChipID:0x%06X\n", years, months, pid);
-  //years = date_reg[2]<<9;
-  //printf("Years: %d\n", years);
   HAL_Delay(200);
 
   return ret;
@@ -317,8 +314,9 @@ void Thermo_Sensor_Init(void)
 
 void Thermo_Sensor_Test(void)
 {
-  uint8_t ret=0xff;
+  uint8_t ret=HAL_ERROR;
   int32_t result = 0;
   ret = Thermo_read_data(&result);
+  UNUSED(ret);
   //printf("raw(status %d): %d\n\n", ret, result);
 }
