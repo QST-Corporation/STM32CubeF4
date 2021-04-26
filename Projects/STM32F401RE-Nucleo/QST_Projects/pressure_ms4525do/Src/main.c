@@ -174,7 +174,7 @@ int main(void)
   while (1)
   {
     MS4525DO_Sensor_Test();
-    HAL_Delay(3000);
+    HAL_Delay(200);
   }
 }
 

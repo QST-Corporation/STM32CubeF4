@@ -37,7 +37,12 @@
  * @date    2021-04-13
  * @id      $Id$
  * @brief   This file provides the functions for TE MS4525DO sensor evaluation.
- *
+ *          |----------------------|
+ *          |--F401RE---|--MS4525--|
+ *          |----------------------|
+ *          |---PB6-----|---SCL----|
+ *          |---PB7-----|---SDA----|
+ *          |---+5V-----|--Supply--|
  * @note
  *
  *****************************************************************************/
@@ -54,10 +59,14 @@
  *                      Macros
  ******************************************************/
 //#define __weak __attribute__((weak))
+#define PARTNUMBER                    MS4525DO_DS_5AI_0001_D //Supply 5V, A type, range 20 psi, 
 #define I2C_SLAVE_ADDR                0x28//0x28,0x36,0x46
 #define I2C_SLAVE_ADDR_READ           ((I2C_SLAVE_ADDR<<1)|1)
-#define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)	 
+#define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)
 #define MS4525DO_TIMEOUT              0xFF //I2C operation timout in ms
+#define MS4525DO_PMAX                 18//20*90%, Range 20psi
+#define MS4525DO_PMIN                 2 //20*10%
+#define MS4525DO_FULL_SCALE           (float)16383 //14bit
 
 typedef enum {
   MS_NORMAL_GOOD,
@@ -171,8 +180,8 @@ uint8_t MS4525DO_data_read(uint8_t *pdata)
     return HAL_ERROR;
   }
   error = MS_I2C_Read(i2c_buf, 4);
-  printf("MS_I2C_Read(%d):0x%02X,0x%02X,0x%02X,0x%02X\n",\
-          error, i2c_buf[0], i2c_buf[1], i2c_buf[2], i2c_buf[3]);
+  //printf("MS_I2C_Read(%d):0x%02X,0x%02X,0x%02X,0x%02X\n",\
+  //        error, i2c_buf[0], i2c_buf[1], i2c_buf[2], i2c_buf[3]);
   memmove(pdata, i2c_buf, 4);
 
   return error;
@@ -184,7 +193,7 @@ void MS4525DO_Sensor_Test(void)
   ms_status_t status = MS_FAULT;
   uint8_t databuf[4] = {0x00};
   int16_t bridge = 0, temperature = 0;
-  float temp_degree = 0;
+  float temp_degree = 0, pressure = 0;
 
   ret = MS4525DO_data_read(databuf);
   if (ret  == HAL_OK) {
@@ -193,7 +202,9 @@ void MS4525DO_Sensor_Test(void)
     status = (ms_status_t)(databuf[0] >> 5);
   }
 
-  temp_degree = (float)temperature*200/2047 - 50;
+  temp_degree = (float)temperature*200/2047 - 50; //came from datasheet page4/14
+  pressure = (((float)bridge-MS4525DO_FULL_SCALE*0.1)*(MS4525DO_PMAX-MS4525DO_PMIN))
+              /(MS4525DO_FULL_SCALE*0.8) + MS4525DO_PMIN;
 
-  printf("MS4525DO(status %d) bridge: %d, temperature(%d): %.1f℃\n\n", status, bridge, temperature, temp_degree);
+  printf("[status %d], %d, %.4f, %.1f℃\n", status, bridge, pressure, temp_degree);
 }
