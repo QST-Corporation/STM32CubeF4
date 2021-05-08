@@ -63,6 +63,7 @@
 #define I2C_SLAVE_ADDR_READ           ((I2C_SLAVE_ADDR<<1)|1)
 #define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)
 #define FLS110_TIMEOUT                0xFF //I2C operation timout in ms
+#define FLS110_MAX_PAYLOAD            0x0C //12U
 #define FLS110_REG_FW_ID              0x10
 #define FLS110_REG_UNIQUE_ID          0x11
 #define FLS110_REG_FW_BUILD           0x12
@@ -91,8 +92,26 @@
 typedef enum {
   FLS_MODE_IDLE,
   FLS_MODE_CONTINUOUS,
-  FLS_MODE_SINGLESHOT
+  FLS_MODE_SINGLESHOT,
+  FLS_MODE_ILLEGAL = 0xFFU
 }fls_mode_t;
+
+typedef enum {
+  FLS_BASIS_MASSFLOW,
+  FLS_BASIS_DP,
+  FLS_BASIS_ILLEGAL = 0xFFU
+}fls_basis_t;
+
+typedef enum {
+  FLS_SUCCESS    = 0x00U,
+  FLS_ERROR      = 0x01U
+}fls_status_t;
+
+typedef enum {
+  FLS_NOTREADY   = 0x00U,
+  FLS_READY      = 0x01U,
+  FLS_READY_ILLEGAL = 0xFFU
+}fls_ready_t;
 
 extern void Error_Handler(void);
 
@@ -181,7 +200,7 @@ static HAL_StatusTypeDef FLS_I2C_Read(uint8_t *pData, uint16_t size)
   return Status;
 }
 
-HAL_StatusTypeDef FLS_I2C_Write(uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef FLS_I2C_Write(uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
 
@@ -189,7 +208,7 @@ HAL_StatusTypeDef FLS_I2C_Write(uint8_t *pData, uint16_t size)
   return Status;
 }
 
-static HAL_StatusTypeDef FLS_Reg_Read(uint8_t reg, uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef FLS110_Reg_Read(uint8_t reg, uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
 
@@ -198,54 +217,167 @@ static HAL_StatusTypeDef FLS_Reg_Read(uint8_t reg, uint8_t *pData, uint16_t size
     return Status;
   }
 
-  Status = FLS_I2C_Read(pData, size);
-  return Status;
+  return FLS_I2C_Read(pData, size);
 }
 
-uint8_t FLS110_data_read(uint8_t *pdata)
+static HAL_StatusTypeDef FLS110_Reg_Write(uint8_t reg, uint8_t *pData, uint16_t size)
 {
-  uint8_t	i2c_buf[20]={0};
-  uint8_t error = 0;
+  uint8_t payload[FLS110_MAX_PAYLOAD] = {0,};
+
+  payload[0] = reg;
+  memmove(&payload[1], pData, size);
+  return FLS_I2C_Write(payload, size+1);
+}
+
+static fls_status_t FLS110_data_read(uint32_t *pdata)
+{
+  HAL_StatusTypeDef ret;
+  uint8_t	regVal[4]={0}, regTemp[2]={0};
+  float flowTemp = 0;
 
   if(pdata == NULL)
   {
-    return HAL_ERROR;
+    return FLS_ERROR;
   }
-  error = FLS_I2C_Read(i2c_buf, 4);
-  //printf("FLS_I2C_Read(%d):0x%02X,0x%02X,0x%02X,0x%02X\n",\
-  //        error, i2c_buf[0], i2c_buf[1], i2c_buf[2], i2c_buf[3]);
-  memmove(pdata, i2c_buf, 4);
+  ret = FLS110_Reg_Read(FLS110_REG_READING, regVal, 4);
+  memmove((uint8_t *)pdata, regVal, sizeof(regVal));
+  FLS110_Reg_Read(FLS110_REG_FLOW_TEMP, regTemp, sizeof(regTemp));
+  flowTemp = (float)((int16_t)regTemp[1] << 8 | regTemp[0])/256;
+  printf("Reg_READING(%d), %d, %.1f℃\n", ret, *pdata, flowTemp);
 
-  return error;
+  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
 }
 
-void FLS110_Check_FW_ID(void)
+static fls_status_t FLS110_Check_FW_ID(void)
 {
   //uint32_t readoutFwId = 0;
   uint8_t regVal[4] = {0,};
   HAL_StatusTypeDef ret;
 
-  ret = FLS_Reg_Read(FLS110_REG_FW_ID, regVal, sizeof(regVal));
+  ret = FLS110_Reg_Read(FLS110_REG_FW_ID, regVal, sizeof(regVal));
   printf("FW_ID: %02X,%02X,%02X,%02X\n", regVal[0],regVal[1],regVal[2],regVal[3]);
   //readoutFwId = regVal[0]
+  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
 }
 
-void FLS110_Check_Unique_ID(void)
+static fls_status_t FLS110_Check_Unique_ID(void)
 {
   uint8_t regVal[12] = {0,};
   HAL_StatusTypeDef ret;
 
-  ret = FLS_Reg_Read(FLS110_REG_UNIQUE_ID, regVal, sizeof(regVal));
+  ret = FLS110_Reg_Read(FLS110_REG_UNIQUE_ID, regVal, sizeof(regVal));
   printf("Processor ID: ");
   for(uint8_t i=0; i<sizeof(regVal); i++) {
     printf("%02X,", regVal[i]);
   }
   printf("\n");
+  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
+}
+
+static fls_status_t FLS110_Set_Mode(fls_mode_t mode)
+{
+  HAL_StatusTypeDef ret;
+  fls_mode_t readout_mode = FLS_MODE_ILLEGAL;
+  ret = FLS110_Reg_Write(FLS110_REG_MODE, &mode, 1);
+  //printf("Set FLS110 mode %d status:%d\n", mode, ret);
+  if (ret != HAL_OK){
+    printf("Set FLS110 mode %d failed\n", mode);
+    return FLS_ERROR;
+  }
+
+  HAL_Delay(10);
+  ret = FLS110_Reg_Read(FLS110_REG_MODE, &readout_mode, 1);
+  //printf("Readout FLS110 mode %d status: %d\n", readout_mode, ret);
+  if((ret != HAL_OK) || (readout_mode != mode))
+  {
+    printf("Verify FLS110 mode %d failed, readout: %d\n", mode, readout_mode);
+    return FLS_ERROR;
+  }
+  printf("Set FLS110 mode %d success\n", mode);
+  return FLS_SUCCESS;
+}
+
+static fls_status_t FLS110_Set_Avg(uint8_t avg)
+{
+  HAL_StatusTypeDef ret;
+  uint8_t readout_avg = 0xFF;
+  ret = FLS110_Reg_Write(FLS110_REG_AVG_WINDOW, &avg, 1);
+  //printf("Set FLS110 Avg %d status:%d\n", avg, ret);
+  if (ret != HAL_OK){
+    printf("Set FLS110 Avg %d failed\n", avg);
+    return FLS_ERROR;
+  }
+
+  HAL_Delay(10);
+  ret = FLS110_Reg_Read(FLS110_REG_AVG_WINDOW, &readout_avg, 1);
+  //printf("Readout FLS110 Avg %d status: %d\n", readout_avg, ret);
+  if((ret != HAL_OK) || (readout_avg != avg))
+  {
+    printf("Verify FLS110 Avg %d failed, readout: %d\n", avg, readout_avg);
+    return FLS_ERROR;
+  }
+  printf("Set FLS110 Avg %d success\n", avg);
+  return FLS_SUCCESS;
+}
+
+static fls_status_t FLS110_Set_Basis(fls_basis_t basis)
+{
+  HAL_StatusTypeDef ret;
+  fls_basis_t readout_basis = FLS_BASIS_ILLEGAL;
+  ret = FLS110_Reg_Write(FLS110_REG_BASIS, &basis, 1);
+  //printf("Set FLS110 basis %d status:%d\n", basis, ret);
+  if (ret != HAL_OK){
+    printf("Set FLS110 basis %d failed\n", basis);
+    return FLS_ERROR;
+  }
+
+  HAL_Delay(10);
+  ret = FLS110_Reg_Read(FLS110_REG_BASIS, &readout_basis, 1);
+  //printf("Readout FLS110 basis %d status: %d\n", readout_basis, ret);
+  if((ret != HAL_OK) || (readout_basis != basis))
+  {
+    printf("Verify FLS110 basis %d failed, readout: %d\n", basis, readout_basis);
+    return FLS_ERROR;
+  }
+  printf("Set FLS110 basis %d success\n", basis);
+  return FLS_SUCCESS;
+}
+
+static fls_ready_t FLS110_Get_Ready(void)
+{
+  fls_ready_t regReady = FLS_READY_ILLEGAL;
+  HAL_StatusTypeDef ret;
+
+  ret = FLS110_Reg_Read(FLS110_REG_READY, &regReady, 1);
+  UNUSED(ret);//printf("Reg READY(%02X): %02X\n", ret, regReady);
+  return regReady;
+}
+
+void FLS110_Sensor_Start(void)
+{
+  FLS110_Set_Mode(FLS_MODE_CONTINUOUS);
+}
+
+void FLS110_Sensor_Stop(void)
+{
+  FLS110_Set_Mode(FLS_MODE_IDLE);
+}
+
+void FLS110_Sensor_Init(void)
+{
+  FLS110_Check_FW_ID();
+  FLS110_Check_Unique_ID();
+  FLS110_Set_Avg(128);
+  FLS110_Set_Basis(FLS_BASIS_DP);
+  FLS110_Sensor_Start();
 }
 
 void FLS110_Sensor_Test(void)
 {
-  FLS110_Check_FW_ID();
-  //HAL_Delay(500);
-  FLS110_Check_Unique_ID();
+  uint32_t fls_reading = 0;
+
+  while(FLS110_Get_Ready() != FLS_READY){
+    //HAL_Delay(1);
+  }
+  FLS110_data_read(&fls_reading);
 }

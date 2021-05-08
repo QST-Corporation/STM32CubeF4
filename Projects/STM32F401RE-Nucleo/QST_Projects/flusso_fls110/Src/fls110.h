@@ -74,6 +74,8 @@ extern "C"
  *             Function Declarations
  ******************************************************/
 void FLS_I2C1_Init(void);
+void FLS110_Sensor_Init(void);
+void FLS110_Sensor_Start(void);
 void FLS110_Sensor_Test(void);
 
 #ifdef __cplusplus

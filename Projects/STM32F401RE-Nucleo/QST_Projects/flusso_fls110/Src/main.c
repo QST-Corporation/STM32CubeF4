@@ -31,12 +31,12 @@
 **************************************************************************************************/
 
 /******************************************************************************
- * @file    pressure_ms4525do/Src/main.c
+ * @file    flusso_fls110/Src/main.c
  * @author  QST AE team
  * @version V0.1
  * @date    2021-04-13
  * @id      $Id$
- * @brief   This code used to test TE MS4525DO pressure sensor and output the data via debug UART.
+ * @brief   This code used to test Flusso FLS110 sensor and output the data via debug UART.
  *
  * @note
  *
@@ -169,13 +169,13 @@ int main(void)
 
   /* Perform I2C initialization for FLS110 sensor*/
   FLS_I2C1_Init();
-  FLS110_Sensor_Test();
+  FLS110_Sensor_Init();
 
   /* Infinite loop */
   while (1)
   {
-    //FLS110_Sensor_Test();
-    //HAL_Delay(3000);
+    FLS110_Sensor_Test();
+    //HAL_Delay(1000);
   }
 }
 

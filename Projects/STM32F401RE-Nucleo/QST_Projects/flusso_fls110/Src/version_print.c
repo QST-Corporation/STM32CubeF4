@@ -115,8 +115,8 @@ void PrintVersion(void)
 
   printf( "\r\n" );
   printf( "=========================================================\r\n" );
-  printf( "             QST Corporation Ltd.\r\n" );
-  printf( "            FLS110 Sensor Test\r\n" );
+  printf( "            QST Corporation Ltd.\r\n" );
+  printf( "             FLS110 Sensor Test\r\n" );
   printf( "             (Version %s)\r\n", get_app_ver());
   printf( "         [Build Time: 20%s]\r\n", time);
   //printf( "               --By %s\r\n", AUTHOR);
