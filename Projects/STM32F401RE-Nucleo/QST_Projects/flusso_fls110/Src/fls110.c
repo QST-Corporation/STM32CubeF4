@@ -229,21 +229,59 @@ static HAL_StatusTypeDef FLS110_Reg_Write(uint8_t reg, uint8_t *pData, uint16_t 
   return FLS_I2C_Write(payload, size+1);
 }
 
-static fls_status_t FLS110_data_read(uint32_t *pdata)
+static fls_status_t FLS110_pflow_read(float *pdata)
+{
+  HAL_StatusTypeDef ret;
+  uint8_t	regVal[4]={0};
+  uint32_t regPflow = 0;
+  float pflow = 0.0f;
+
+  if(pdata == NULL)
+  {
+    return FLS_ERROR;
+  }
+  ret = FLS110_Reg_Read(FLS110_REG_P_FLOW, regVal, 4);
+  memmove((uint8_t *)&regPflow, regVal, sizeof(regVal));
+  pflow = (float)regPflow/256;
+
+  printf("FLS110 Pflow(%d), %d, %.4fPa\n", ret, regPflow, pflow);
+  *pdata = pflow;
+
+  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
+}
+
+static fls_status_t FLS110_data_read(float *pdata)
 {
   HAL_StatusTypeDef ret;
   uint8_t	regVal[4]={0}, regTemp[2]={0};
-  float flowTemp = 0;
+  uint32_t reading = 0;
+  float flowTemp = 0.0f;
+  float pressure = 0.0f, psquare = 0.0f;
+  float air_speed = 0.0f;
 
   if(pdata == NULL)
   {
     return FLS_ERROR;
   }
   ret = FLS110_Reg_Read(FLS110_REG_READING, regVal, 4);
-  memmove((uint8_t *)pdata, regVal, sizeof(regVal));
+  memmove((uint8_t *)&reading, regVal, sizeof(regVal));
+  pressure = (float)reading/256;
+  psquare = pressure*pressure;
   FLS110_Reg_Read(FLS110_REG_FLOW_TEMP, regTemp, sizeof(regTemp));
   flowTemp = (float)((int16_t)regTemp[1] << 8 | regTemp[0])/256;
-  printf("Reg_READING(%d), %d, %.1f℃\n", ret, *pdata, flowTemp);
+
+  if(pressure < 40) {
+    air_speed = 0;
+  }
+  else if(pressure < 80) {
+    air_speed = (-0.0016f)*psquare + 0.2715f*pressure - 8.7785f;
+  } else if(pressure < 450) {
+    air_speed = (-0.00001f)*psquare + 0.0184f*pressure + 1.4547f;
+  } else {
+    air_speed = (-0.0000006f)*psquare + 0.0093f*pressure + 3.7301f;
+  }
+  printf("FLS110(%d), %d, %.4f, %.1f, %.1f℃\n", ret, reading, pressure, air_speed, flowTemp);
+  *pdata = air_speed;
 
   return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
 }
@@ -367,17 +405,19 @@ void FLS110_Sensor_Init(void)
 {
   FLS110_Check_FW_ID();
   FLS110_Check_Unique_ID();
-  FLS110_Set_Avg(128);
+  FLS110_Set_Avg(8);
   FLS110_Set_Basis(FLS_BASIS_DP);
   FLS110_Sensor_Start();
 }
 
 void FLS110_Sensor_Test(void)
 {
-  uint32_t fls_reading = 0;
+  float air_speed = 0;
+  //float pflow = 0.0f;
 
   while(FLS110_Get_Ready() != FLS_READY){
     //HAL_Delay(1);
   }
-  FLS110_data_read(&fls_reading);
+  FLS110_data_read(&air_speed);
+  //FLS110_pflow_read(&pflow);
 }

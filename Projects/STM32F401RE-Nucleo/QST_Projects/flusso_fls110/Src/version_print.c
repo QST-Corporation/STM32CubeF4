@@ -63,7 +63,7 @@
 /******************************************************
  *                 Static Variables
  ******************************************************/
-static char app_ver_str[50] = {"0.0.01"};
+static char app_ver_str[50] = {"0.0.02"};
 const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
                         "Sep", "Oct", "Nov", "Dec"};
 
