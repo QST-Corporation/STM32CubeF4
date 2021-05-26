@@ -173,8 +173,10 @@ void sw_i2c_init(void)
   HAL_GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStruct);
 
   GPIO_InitStruct.Pin = I2C_SDA_PIN;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD; //for inout and output, need external pull-up
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD; //for input and output, need external pull-up
   HAL_GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStruct);
+  I2C_SDA_HIGH();
+  I2C_SCL_HIGH();
 
   //timer2 for i2c delay
   MX_TIM2_Init();
@@ -185,23 +187,23 @@ static void sw_i2c_start(void)
   I2C_SDA_HIGH();
   //sw_i2c_delay_us(5);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(10);
+  sw_i2c_delay_us(4);
   I2C_SDA_LOW();
-  sw_i2c_delay_us(10);
-  I2C_SCL_LOW();
-  sw_i2c_delay_us(10);
+  sw_i2c_delay_us(4);
+  //I2C_SCL_LOW();
+  //sw_i2c_delay_us(10);
 }
 
 static void sw_i2c_stop(void)
 {
-  I2C_SCL_LOW();
-  sw_i2c_delay_us(5);
+  //I2C_SCL_LOW();
+  //sw_i2c_delay_us(5);
   I2C_SDA_LOW();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SDA_HIGH();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
 }
 
 static void i2c_send_ack(void)
@@ -232,17 +234,18 @@ static uint8_t sw_i2c_wait_ack(void)
 {
   I2C_SDA_HIGH();
 
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   if(I2C_SDA_READ())
   {
-    //i2c_stop();
     printf("i2c wait ACK failed\n");
-    I2C_SCL_LOW();
+    //i2c_stop();
+    //I2C_SCL_LOW();
     return HAL_ERROR;
   }
   I2C_SCL_LOW();
+  //sw_i2c_delay_us(2);
   return HAL_OK; 
 }
 
@@ -253,7 +256,7 @@ static void sw_i2c_send_byte(uint8_t data)
   while(i--)
   {
     I2C_SCL_LOW();
-    sw_i2c_delay_us(5);
+    sw_i2c_delay_us(2);
     if(data & 0x80)
     {
       I2C_SDA_HIGH();
@@ -263,10 +266,10 @@ static void sw_i2c_send_byte(uint8_t data)
       I2C_SDA_LOW();
     }
 
-    sw_i2c_delay_us(5);
+    sw_i2c_delay_us(2);
     data <<= 1;
     I2C_SCL_HIGH();
-    sw_i2c_delay_us(5);
+    sw_i2c_delay_us(4);
   }
   I2C_SCL_LOW();
 }
@@ -276,16 +279,19 @@ static uint8_t i2c_receive_byte(void)
   uint8_t i = 8;
   uint8_t data = 0;
 
-  I2C_SDA_HIGH();
+  //I2C_SDA_HIGH();
+  //sw_i2c_delay_us(4);
   while(i--)
   {
     data <<= 1;
     I2C_SCL_LOW();
-    sw_i2c_delay_us(5);
+    sw_i2c_delay_us(4);
     I2C_SCL_HIGH();
-    sw_i2c_delay_us(5);
-    if(I2C_SDA_READ()) 
-        data |= 0x01;
+    sw_i2c_delay_us(4);
+    if(I2C_SDA_READ())
+    {
+      data |= 0x01;
+    }
   }
   I2C_SCL_LOW();
   return(data);
@@ -306,6 +312,7 @@ HAL_StatusTypeDef sw_i2c_receive(uint8_t slave_addr, uint8_t reg_addr,
     return HAL_ERROR;
   }
   //sw_i2c_stop(); //????
+  sw_i2c_delay_us(4);
   sw_i2c_start();
   sw_i2c_send_byte((slave_addr<<1) | I2C_READ_MASK);
   if(sw_i2c_wait_ack() != HAL_OK) {
