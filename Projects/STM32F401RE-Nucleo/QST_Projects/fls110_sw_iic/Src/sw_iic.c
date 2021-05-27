@@ -206,6 +206,7 @@ void sw_i2c_init(void)
 
   GPIO_InitStruct.Pin = I2C_SDA_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD; //for input and output, need external pull-up
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStruct);
   //I2C_SDA_HIGH();
   //I2C_SCL_HIGH();
@@ -220,9 +221,9 @@ static void sw_i2c_start(void)
   I2C_SDA_HIGH();
   //sw_i2c_delay_us(5);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(4);
+  sw_i2c_delay_us(10);
   I2C_SDA_LOW();
-  sw_i2c_delay_us(4);
+  sw_i2c_delay_us(10);
   //I2C_SCL_LOW();
   //sw_i2c_delay_us(10);
 }
@@ -230,14 +231,15 @@ static void sw_i2c_start(void)
 static void sw_i2c_stop(void)
 {
   sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
-  //I2C_SCL_LOW();
-  //sw_i2c_delay_us(5);
   I2C_SDA_LOW();
-  sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(4);
+  sw_i2c_delay_us(10);
+  I2C_SDA_LOW();
+  sw_i2c_delay_us(10);
+  I2C_SCL_HIGH();
+  sw_i2c_delay_us(10);
   I2C_SDA_HIGH();
-  sw_i2c_delay_us(4);
+  sw_i2c_delay_us(10);
 }
 
 static void i2c_send_ack(void)
@@ -246,11 +248,11 @@ static void i2c_send_ack(void)
   //I2C_SCL_LOW();
   //sw_i2c_delay_us(5);
   I2C_SDA_LOW();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SCL_LOW();
-  //sw_i2c_delay_us(5);
+  //sw_i2c_delay_us(4);
 }
 
 static void i2c_send_noack(void)
@@ -259,11 +261,11 @@ static void i2c_send_noack(void)
   //I2C_SCL_LOW();
   //sw_i2c_delay_us(5);
   I2C_SDA_HIGH();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(5);
+  sw_i2c_delay_us(4);
   I2C_SCL_LOW();
-  //sw_i2c_delay_us(5);
+  //sw_i2c_delay_us(4);
 }
 
 static uint8_t sw_i2c_wait_ack(void)
@@ -273,14 +275,15 @@ static uint8_t sw_i2c_wait_ack(void)
 
   sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
-  sw_i2c_delay_us(4);
+  //sw_i2c_delay_us(4);
   if(I2C_SDA_READ())
   {
     printf("i2c wait ACK failed\n");
-    //i2c_stop();
-    //I2C_SCL_LOW();
+    //sw_i2c_stop();
+    I2C_SCL_LOW();
     return HAL_ERROR;
   }
+  sw_i2c_delay_us(4);
   I2C_SCL_LOW();
   //sw_i2c_delay_us(2);
   return HAL_OK; 
@@ -310,6 +313,7 @@ static void sw_i2c_send_byte(uint8_t data)
     sw_i2c_delay_us(4);
   }
   I2C_SCL_LOW();
+  //I2C_SDA_HIGH();
 }
 
 static uint8_t i2c_receive_byte(void)
@@ -333,6 +337,7 @@ static uint8_t i2c_receive_byte(void)
     }
   }
   I2C_SCL_LOW();
+  //I2C_SDA_HIGH();
   return(data);
 }
 

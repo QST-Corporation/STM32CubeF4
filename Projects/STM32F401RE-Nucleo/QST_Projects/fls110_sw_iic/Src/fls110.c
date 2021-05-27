@@ -324,10 +324,14 @@ void FLS110_Sensor_Stop(void)
 void FLS110_Sensor_Init(void)
 {
   FLS110_Check_FW_ID();
-  //FLS110_Check_Unique_ID();
-  //FLS110_Set_Avg(8);
-  //FLS110_Set_Basis(FLS_BASIS_DP);
-  //FLS110_Sensor_Start();
+  HAL_Delay(10);
+  FLS110_Check_Unique_ID();
+  HAL_Delay(10);
+  FLS110_Set_Avg(8);
+  HAL_Delay(10);
+  FLS110_Set_Basis(FLS_BASIS_DP);
+  HAL_Delay(10);
+  FLS110_Sensor_Start();
 }
 
 void FLS110_Sensor_Test(void)
