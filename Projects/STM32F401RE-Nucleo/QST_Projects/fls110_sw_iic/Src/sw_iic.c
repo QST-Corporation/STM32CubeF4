@@ -64,13 +64,16 @@
 #define I2C_READ_MASK                 1
 #define I2C_SCL_PIN                   GPIO_PIN_8
 #define I2C_SDA_PIN                   GPIO_PIN_9
+#define I2C_SCL_PIN_NUM               8
+#define I2C_SDA_PIN_NUM               9
 #define I2C_GPIO_PORT                 GPIOB
 #define I2C_SCL_HIGH()                HAL_GPIO_WritePin(I2C_GPIO_PORT, I2C_SCL_PIN, GPIO_PIN_SET)
 #define I2C_SCL_LOW()                 HAL_GPIO_WritePin(I2C_GPIO_PORT, I2C_SCL_PIN, GPIO_PIN_RESET)
 #define I2C_SDA_HIGH()                HAL_GPIO_WritePin(I2C_GPIO_PORT, I2C_SDA_PIN, GPIO_PIN_SET)
 #define I2C_SDA_LOW()                 HAL_GPIO_WritePin(I2C_GPIO_PORT, I2C_SDA_PIN, GPIO_PIN_RESET)
 #define I2C_SDA_READ()                HAL_GPIO_ReadPin(I2C_GPIO_PORT, I2C_SDA_PIN)
-
+//#define I2C_SDA_OUTPUT()              I2C_PORT_HANDL->MODER = GPIO_MODE_OUTPUT_OD << (2*I2C_SDA_PIN_NUM)
+//#define I2C_SDA_INPUT()               I2C_PORT_HANDL->MODER = GPIO_MODE_INPUT << (2*I2C_SDA_PIN_NUM)
 
 extern void Error_Handler(void);
 
@@ -83,6 +86,7 @@ extern void Error_Handler(void);
  ******************************************************/
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim2;
+//GPIO_TypeDef *I2C_PORT_HANDL = I2C_GPIO_PORT;
 
 /* Private function prototypes -----------------------------------------------*/
 #if 1
@@ -108,6 +112,34 @@ static void sw_i2c_delay_us(uint32_t us)
   while(us--);
 }
 #endif
+
+static void sw_i2c_sda_dir(uint32_t mode)
+{
+#if 0
+  GPIO_TypeDef *I2C_PORT_HANDL;
+  uint32_t temp = 0;
+
+  I2C_PORT_HANDL = I2C_GPIO_PORT;
+/* Configure IO Direction mode (Input, Output, Alternate or Analog) */
+  temp = I2C_PORT_HANDL->MODER;
+  temp &= ~(GPIO_MODER_MODER0 << (I2C_SDA_PIN_NUM * 2U));
+  temp |= ((mode & GPIO_MODE) << (I2C_SDA_PIN_NUM * 2U));
+  I2C_PORT_HANDL->MODER = temp;
+#else
+  GPIO_InitTypeDef  GPIO_InitStruct;
+
+  GPIO_InitStruct.Pin = I2C_SCL_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FAST;
+  HAL_GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStruct);
+
+  GPIO_InitStruct.Pin = I2C_SDA_PIN;
+  GPIO_InitStruct.Mode = mode; //for input and output, need external pull-up
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStruct);
+#endif
+}
 
 /**
   * @brief TIM2 Initialization Function
@@ -175,8 +207,8 @@ void sw_i2c_init(void)
   GPIO_InitStruct.Pin = I2C_SDA_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD; //for input and output, need external pull-up
   HAL_GPIO_Init(I2C_GPIO_PORT, &GPIO_InitStruct);
-  I2C_SDA_HIGH();
-  I2C_SCL_HIGH();
+  //I2C_SDA_HIGH();
+  //I2C_SCL_HIGH();
 
   //timer2 for i2c delay
   MX_TIM2_Init();
@@ -184,6 +216,7 @@ void sw_i2c_init(void)
 
 static void sw_i2c_start(void)
 {
+  sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
   I2C_SDA_HIGH();
   //sw_i2c_delay_us(5);
   I2C_SCL_HIGH();
@@ -196,6 +229,7 @@ static void sw_i2c_start(void)
 
 static void sw_i2c_stop(void)
 {
+  sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
   //I2C_SCL_LOW();
   //sw_i2c_delay_us(5);
   I2C_SDA_LOW();
@@ -208,6 +242,7 @@ static void sw_i2c_stop(void)
 
 static void i2c_send_ack(void)
 {
+  sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
   //I2C_SCL_LOW();
   //sw_i2c_delay_us(5);
   I2C_SDA_LOW();
@@ -220,6 +255,7 @@ static void i2c_send_ack(void)
 
 static void i2c_send_noack(void)
 {
+  sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
   //I2C_SCL_LOW();
   //sw_i2c_delay_us(5);
   I2C_SDA_HIGH();
@@ -232,7 +268,8 @@ static void i2c_send_noack(void)
 
 static uint8_t sw_i2c_wait_ack(void)
 {
-  I2C_SDA_HIGH();
+  //I2C_SDA_HIGH();
+  sw_i2c_sda_dir(GPIO_MODE_INPUT);
 
   sw_i2c_delay_us(4);
   I2C_SCL_HIGH();
@@ -253,6 +290,7 @@ static void sw_i2c_send_byte(uint8_t data)
 {
   uint8_t i = 8;
 
+  sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
   while(i--)
   {
     I2C_SCL_LOW();
@@ -280,6 +318,7 @@ static uint8_t i2c_receive_byte(void)
   uint8_t data = 0;
 
   //I2C_SDA_HIGH();
+  sw_i2c_sda_dir(GPIO_MODE_INPUT);
   //sw_i2c_delay_us(4);
   while(i--)
   {
@@ -376,6 +415,7 @@ void sw_i2c_scl_toggle(void)
 
 void sw_i2c_sda_toggle(void)
 {
+  sw_i2c_sda_dir(GPIO_MODE_OUTPUT_OD);
   I2C_SDA_LOW();
   sw_i2c_delay_us(5);
   I2C_SDA_HIGH();
