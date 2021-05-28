@@ -43,6 +43,7 @@
  *****************************************************************************/
 
 /* Includes ------------------------------------------------------------------*/
+#include <string.h>
 #include "main.h"
 #include "bsp_uart.h"
 #include "version_print.h"
@@ -146,6 +147,7 @@ static void BSP_Device_Init(void)
   BSP_UART_Init();
 }
 
+
 /**
   * @brief  Main program
   * @param  None
@@ -179,6 +181,7 @@ int main(void)
     FLS110_Sensor_Test();
     MS4525DO_Sensor_Test();
     //HAL_Delay(1000);
+    
   }
 }
 

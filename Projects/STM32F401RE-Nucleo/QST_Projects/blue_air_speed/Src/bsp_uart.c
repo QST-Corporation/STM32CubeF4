@@ -58,6 +58,7 @@
 #endif /* UNUSED_PARAMETER */
 
 /* Private function prototypes -----------------------------------------------*/
+void BSP_STDIO_Read(uint8_t *data, uint16_t size);
 #ifdef __GNUC__
   /* With GCC, small printf (option LD Linker->Libraries->Small printf
      set to 'Yes') calls __io_putchar() */
@@ -72,6 +73,8 @@
 
 /* Definition for UartStdio clock resources */
 #define USART_STDIO_UART                      USART2
+#define USART_STDIO_UART_IRQn                 USART2_IRQn
+//#define USART_STDIO_UART_IRQHandler           USART2_IRQHandler
 #define USART_STDIO_CLK_ENABLE()              __HAL_RCC_USART2_CLK_ENABLE();
 #define USART_STDIO_RX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE()
 #define USART_STDIO_TX_GPIO_CLK_ENABLE()      __HAL_RCC_GPIOA_CLK_ENABLE() 
@@ -121,14 +124,17 @@ typedef struct
 /******************************************************
  *                 Global Variables
  ******************************************************/
+bool fls110Log = true;
+bool ms4525Log = true;
 
 /******************************************************
  *                 Static Variables
  ******************************************************/
 /* UART handler declaration */
-static UART_HandleTypeDef UartStdio;
+UART_HandleTypeDef UartStdio;
 static UART_HandleTypeDef UartCom;
 static uart_interface_t UartComInterface;
+uint8_t uart_cmd_str[20] = {0};
 
 /**
   * @brief  Retargets the C library printf function to the USART.
@@ -139,13 +145,15 @@ PUTCHAR_PROTOTYPE
 {
   /* Place your implementation of fputc here */
   /* e.g. write a character to the EVAL_COM1 and Loop until the end of transmission */
-  HAL_UART_Transmit(&UartStdio, (uint8_t *)&ch, 1, 0xFFFF); 
+  HAL_UART_Transmit(&UartStdio, (uint8_t *)&ch, 1, 0xFFFF);
+  //HAL_UART_Transmit_IT(&UartStdio, (uint8_t *)&ch, 1);
   return ch;
 }
 
 GETCHAR_PROTOTYPE
 {
     int ch;
+    //HAL_UART_Receive_IT(&UartStdio, (uint8_t*)&ch, 1);
     if (HAL_UART_Receive(&UartStdio, (uint8_t*)&ch, 1, 5000) != HAL_OK)
     {
         return EOF;
@@ -166,6 +174,77 @@ static void Error_Handler(void)
   while(1)
   {
   }
+}
+
+void UartCmdParse(void)
+{
+  uint8_t fls110LogOff[] = "flsLogOff";
+  uint8_t fls110LogOn[] = "flsLogOn ";
+  uint8_t ms4525LogOff[] = "msLogOff ";
+  uint8_t ms4525LogOn[] = "msLogOn  ";
+  printf("UartCmd: %s\n", uart_cmd_str);
+  if (memcmp(uart_cmd_str, fls110LogOff, sizeof(fls110LogOff)) == 0)
+  {
+    printf("cmd: fls110LogOff\n");
+    fls110Log = false;
+  } else if (memcmp(uart_cmd_str, fls110LogOn, sizeof(fls110LogOn)) == 0)
+  {
+    printf("cmd: fls110LogOn\n");
+    fls110Log = true;
+  } else if (memcmp(uart_cmd_str, ms4525LogOff, sizeof(ms4525LogOff)) == 0)
+  {
+    printf("cmd: ms4525LogOff\n");
+    ms4525Log = false;
+  } else if (memcmp(uart_cmd_str, ms4525LogOn, sizeof(ms4525LogOn)) == 0)
+  {
+    printf("cmd: ms4525LogOn\n");
+    ms4525Log = true;
+  }
+
+  memset(uart_cmd_str, 0x00, sizeof(uart_cmd_str));
+  BSP_STDIO_Read(uart_cmd_str, 9);
+}
+
+/**
+  * @brief  Tx Transfer completed callback
+  * @param  UartHandle: UART handle. 
+  * @note   This example shows a simple way to report end of IT Tx transfer, and 
+  *         you can add your own implementation. 
+  * @retval None
+  */
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+
+}
+
+/**
+  * @brief  Rx Transfer completed callback
+  * @param  UartHandle: UART handle
+  * @note   This example shows a simple way to report end of IT Rx transfer, and 
+  *         you can add your own implementation.
+  * @retval None
+  */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+{
+  //printf("HAL_UART_RxCpltCallback...\n");
+  UartCmdParse();
+}
+
+/**
+  * @brief  UART error callbacks
+  * @param  UartHandle: UART handle
+  * @note   This example shows a simple way to report transfer error, and you can
+  *         add your own implementation.
+  * @retval None
+  */
+ void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
+{
+  printf("UART_Error...\n");
+}
+
+void BSP_STDIO_Read(uint8_t *data, uint16_t size)
+{
+  HAL_UART_Receive_IT(&UartStdio, data, size);
 }
 
 /** @brief Configure the LOG UART
@@ -217,6 +296,11 @@ void BSP_STDIO_Init(void)
     /* Initialization Error */
     Error_Handler(); 
   }
+
+  /*##-3- Configure the NVIC for UART ########################################*/
+  /* NVIC for USART1 */
+  HAL_NVIC_SetPriority(USART_STDIO_UART_IRQn, 0, 1);
+  HAL_NVIC_EnableIRQ(USART_STDIO_UART_IRQn);
 }
 
 /** @brief LOG UART De-Initialization 
@@ -237,6 +321,9 @@ void BSP_STDIO_DeInit(void)
   HAL_GPIO_DeInit(USART_STDIO_TX_GPIO_PORT, USART_STDIO_TX_PIN);
   /* Configure UART Rx as alternate function  */
   HAL_GPIO_DeInit(USART_STDIO_RX_GPIO_PORT, USART_STDIO_RX_PIN);
+
+  /*##-3- Disable the NVIC for UART ##########################################*/
+  HAL_NVIC_DisableIRQ(USART_STDIO_UART_IRQn);
 }
 
 //void USART_COM_IRQHandler()
@@ -338,5 +425,6 @@ void BSP_UART_Init(void)
 {
   BSP_STDIO_Init();
   BSP_COM_Init();
+  BSP_STDIO_Read(uart_cmd_str, 9);
 }
 

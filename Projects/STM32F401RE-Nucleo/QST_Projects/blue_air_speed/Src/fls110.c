@@ -119,6 +119,7 @@ extern void Error_Handler(void);
  *                 Global Variables
  ******************************************************/
 extern I2C_HandleTypeDef hi2c1;
+extern bool fls110Log;
 
 /******************************************************
  *                 Static Variables
@@ -215,7 +216,9 @@ static fls_status_t FLS110_data_read(float *pdata)
   } else {
     air_speed = (-0.0000006f)*psquare + 0.0093f*pressure + 3.7301f;
   }
-  printf("FLS110(%d), %d, %.4f, %.1f, %.1f℃\n", ret, reading, pressure, air_speed, flowTemp);
+  if (fls110Log) {
+    printf("FLS110(%d), %d, %.4f, %.1f, %.1f℃\n", ret, reading, pressure, air_speed, flowTemp);
+  }
   *pdata = air_speed;
 
   return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
@@ -350,9 +353,8 @@ void FLS110_Sensor_Test(void)
   float air_speed = 0;
   //float pflow = 0.0f;
 
-  while(FLS110_Get_Ready() != FLS_READY){
-    //HAL_Delay(1);
+  if(FLS110_Get_Ready() == FLS_READY){
+    FLS110_data_read(&air_speed);
   }
-  FLS110_data_read(&air_speed);
   //FLS110_pflow_read(&pflow);
 }

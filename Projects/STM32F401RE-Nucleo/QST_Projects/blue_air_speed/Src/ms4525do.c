@@ -81,6 +81,7 @@ extern void Error_Handler(void);
  *                 Global Variables
  ******************************************************/
 extern I2C_HandleTypeDef hi2c1;
+extern bool ms4525Log;
 
 /******************************************************
  *                 Static Variables
@@ -140,6 +141,7 @@ void MS4525DO_Sensor_Test(void)
   temp_degree = (float)temperature*200/2047 - 50; //came from datasheet page4/14
   pressure = (((float)bridge-MS4525DO_FULL_SCALE*0.1)*(MS4525DO_PMAX-MS4525DO_PMIN))
               /(MS4525DO_FULL_SCALE*0.8) + MS4525DO_PMIN;
-
-  printf("[status %d], %d, %.4f, %.1f℃\n", status, bridge, pressure, temp_degree);
+  if (ms4525Log) {
+    printf("[status %d], %d, %.4f, %.1f℃\n", status, bridge, pressure, temp_degree);
+  }
 }
