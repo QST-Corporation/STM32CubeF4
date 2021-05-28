@@ -50,6 +50,7 @@
 #include "air_speed_i2c.h"
 #include "fls110.h"
 #include "ms4525do.h"
+#include "SPL06_01.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -174,14 +175,15 @@ int main(void)
   /* Perform I2C initialization for Air Speed sensors*/
   Air_Speed_I2C1_Init();
   FLS110_Sensor_Init();
+  spl0601_init_and_start();
 
   /* Infinite loop */
   while (1)
   {
-    FLS110_Sensor_Test();
-    MS4525DO_Sensor_Test();
+    //FLS110_Sensor_Test();
+    //MS4525DO_Sensor_Test();
+    spl0601_update_pressure();
     //HAL_Delay(1000);
-    
   }
 }
 

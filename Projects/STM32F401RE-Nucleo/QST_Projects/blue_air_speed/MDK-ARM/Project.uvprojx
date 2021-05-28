@@ -443,6 +443,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\ms4525do.c</FilePath>
             </File>
+            <File>
+              <FileName>SPL06_01.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\SPL06_01.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

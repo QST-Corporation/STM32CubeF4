@@ -17,57 +17,80 @@
 #ifndef SPL06_01_C
 #define SPL06_01_C
 
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <stdio.h>
+#include "bsp_uart.h"
 #include "spl06_01.h"
-//#include "SoftwareI2C.h"
 
+extern I2C_HandleTypeDef hi2c1;
 static struct spl0601_t spl0601;
 static struct spl0601_t *p_spl0601;
+uint32_t start;
 
-void spl0601_write(uint8 hwadr, uint8 regadr, uint8 val);
-uint8 spl0601_read(uint8 hwadr, uint8 regadr);
+HAL_StatusTypeDef spl0601_write(uint8_t hwadr, uint8_t regadr, uint8_t val);
+uint8_t spl0601_read(uint8_t hwadr, uint8_t regadr);
 void spl0601_get_calib_param(void);
+
+static HAL_StatusTypeDef SPL_I2C_Read(uint8_t *pData, uint16_t size)
+{
+  HAL_StatusTypeDef Status;
+  Status = HAL_I2C_Master_Receive(&hi2c1, SPL_SLAVE_ADDR_READ, pData, size, SPL_TIMEOUT);
+  return Status;
+}
+
+HAL_StatusTypeDef SPL_I2C_Write(uint8_t *pData, uint16_t size)
+{
+  HAL_StatusTypeDef Status;
+
+  Status = HAL_I2C_Master_Transmit(&hi2c1, SPL_SLAVE_ADDR_WRITE, pData, size, SPL_TIMEOUT);
+  return Status;
+}
 
 /*****************************************************************************
  Function: spl0601_write
  Description: this function will write data to specofic register through software I2C bus
- Input:  uint8 hwadr   hardware I2C address
-         uint8 regadr  register address
-         uint8 val     write-in value          
+ Input:  uint8_t hwadr   hardware I2C address
+         uint8_t regadr  register address
+         uint8_t val     write-in value          
  Output: 
  Return: 
  Calls: 
  Called By: 
 *****************************************************************************/
-void spl0601_write(uint8 hwadr, uint8 regadr, uint8 val)
+HAL_StatusTypeDef spl0601_write(uint8_t hwadr, uint8_t regadr, uint8_t val)
 {
-    SoftI2C_start();
-    SoftI2C_write_byte(hwadr << 1);
-    SoftI2C_write_byte(regadr);
-    SoftI2C_write_byte(val);
-    SoftI2C_stop();
+    uint8_t payload[2] = {0,};
+
+    payload[0] = regadr;
+    payload[1] = val;
+    return SPL_I2C_Write(payload, sizeof(payload));
 }
 
 /*****************************************************************************
  Function: spl0601_read
  Description: this function will read register data through software I2C bus
- Input: uint8 hwadr   hardware I2C address
-        uint8 regadr  register address        
+ Input: uint8_t hwadr   hardware I2C address
+        uint8_t regadr  register address        
  Output: 
- Return: uint8 readout value
+ Return: uint8_t readout value
  Calls: 
  Called By: 
 *****************************************************************************/
-uint8 spl0601_read(uint8 hwadr, uint8 regadr)
+uint8_t spl0601_read(uint8_t hwadr, uint8_t regadr)
 {
-    uint8 val = 0;
-    SoftI2C_start();
-    SoftI2C_write_byte(hwadr << 1);
-    SoftI2C_write_byte(regadr);
-    SoftI2C_start();
-    SoftI2C_write_byte((hwadr << 1)|0x01);
-    val = SoftI2C_read_byte(1);
-    SoftI2C_stop();
+    uint8_t val = 0;
+    SPL_I2C_Write(&regadr, 1);
+    SPL_I2C_Read(&val, 1);
     return val;
+}
+
+void spl0601_read_multi_bytes(uint8_t hwadr, uint8_t regadr, uint8_t *pdata, uint8_t size)
+{
+    SPL_I2C_Write(&regadr, 1);
+    SPL_I2C_Read(pdata, size);
 }
 
 /*****************************************************************************
@@ -97,18 +120,18 @@ void spl0601_init(void)
 /*****************************************************************************
  Function: spl0601_rateset
  Description: set sample rate and over sample rate per second for specific sensor
- Input:     uint8 u8OverSmpl  oversample rate         Maximal = 128
-            uint8 u8SmplRate  sample rate(Hz) Maximal = 128
-            uint8 iSensor     0: Pressure; 1: Temperature 
+ Input:     uint8_t u8OverSmpl  oversample rate         Maximal = 128
+            uint8_t u8SmplRate  sample rate(Hz) Maximal = 128
+            uint8_t iSensor     0: Pressure; 1: Temperature 
  Output: 
  Return: void
  Calls: 
  Called By: 
 *****************************************************************************/
-void spl0601_rateset(uint8 iSensor, uint8 u8SmplRate, uint8 u8OverSmpl)
+void spl0601_rateset(uint8_t iSensor, uint8_t u8SmplRate, uint8_t u8OverSmpl)
 {
-    uint8 reg = 0;
-    int32 i32kPkT = 0;
+    uint8_t reg = 0;
+    int32_t i32kPkT = 0;
     switch(u8SmplRate)
     {
         case 2:
@@ -216,42 +239,42 @@ void spl0601_rateset(uint8 iSensor, uint8 u8SmplRate, uint8 u8OverSmpl)
 *****************************************************************************/
 void spl0601_get_calib_param(void)
 {
-    uint32 h;
-    uint32 m;
-    uint32 l;
+    uint32_t h;
+    uint32_t m;
+    uint32_t l;
     h =  spl0601_read(HW_ADR, 0x10);
     l  =  spl0601_read(HW_ADR, 0x11);
-    p_spl0601->calib_param.c0 = (int16)h<<4 | l>>4;
+    p_spl0601->calib_param.c0 = (int16_t)h<<4 | l>>4;
     p_spl0601->calib_param.c0 = (p_spl0601->calib_param.c0&0x0800)?(0xF000|p_spl0601->calib_param.c0):p_spl0601->calib_param.c0;
     h =  spl0601_read(HW_ADR, 0x11);
     l  =  spl0601_read(HW_ADR, 0x12);
-    p_spl0601->calib_param.c1 = (int16)(h&0x0F)<<8 | l;
+    p_spl0601->calib_param.c1 = (int16_t)(h&0x0F)<<8 | l;
     p_spl0601->calib_param.c1 = (p_spl0601->calib_param.c1&0x0800)?(0xF000|p_spl0601->calib_param.c1):p_spl0601->calib_param.c1;
     h =  spl0601_read(HW_ADR, 0x13);
     m =  spl0601_read(HW_ADR, 0x14);
     l =  spl0601_read(HW_ADR, 0x15);
-    p_spl0601->calib_param.c00 = (int32)h<<12 | (int32)m<<4 | (int32)l>>4;
+    p_spl0601->calib_param.c00 = (int32_t)h<<12 | (int32_t)m<<4 | (int32_t)l>>4;
     p_spl0601->calib_param.c00 = (p_spl0601->calib_param.c00&0x080000)?(0xFFF00000|p_spl0601->calib_param.c00):p_spl0601->calib_param.c00;
     h =  spl0601_read(HW_ADR, 0x15);
     m =  spl0601_read(HW_ADR, 0x16);
     l =  spl0601_read(HW_ADR, 0x17);
-    p_spl0601->calib_param.c10 = (int32)(h&0x0F)<<16 | (int32)m<<8 | l;
+    p_spl0601->calib_param.c10 = (int32_t)(h&0x0F)<<16 | (int32_t)m<<8 | l;
     p_spl0601->calib_param.c10 = (p_spl0601->calib_param.c10&0x080000)?(0xFFF00000|p_spl0601->calib_param.c10):p_spl0601->calib_param.c10;
     h =  spl0601_read(HW_ADR, 0x18);
     l  =  spl0601_read(HW_ADR, 0x19);
-    p_spl0601->calib_param.c01 = (int16)h<<8 | l;
+    p_spl0601->calib_param.c01 = (int16_t)h<<8 | l;
     h =  spl0601_read(HW_ADR, 0x1A);
     l  =  spl0601_read(HW_ADR, 0x1B);
-    p_spl0601->calib_param.c11 = (int16)h<<8 | l;
+    p_spl0601->calib_param.c11 = (int16_t)h<<8 | l;
     h =  spl0601_read(HW_ADR, 0x1C);
     l  =  spl0601_read(HW_ADR, 0x1D);
-    p_spl0601->calib_param.c20 = (int16)h<<8 | l;
+    p_spl0601->calib_param.c20 = (int16_t)h<<8 | l;
     h =  spl0601_read(HW_ADR, 0x1E);
     l  =  spl0601_read(HW_ADR, 0x1F);
-    p_spl0601->calib_param.c21 = (int16)h<<8 | l;
+    p_spl0601->calib_param.c21 = (int16_t)h<<8 | l;
     h =  spl0601_read(HW_ADR, 0x20);
     l  =  spl0601_read(HW_ADR, 0x21);
-    p_spl0601->calib_param.c30 = (int16)h<<8 | l;
+    p_spl0601->calib_param.c30 = (int16_t)h<<8 | l;
 }
 
 /*****************************************************************************
@@ -285,13 +308,13 @@ void spl0601_start_pressure(void)
 /*****************************************************************************
  Function: spl0601_start_continuous
  Description: Select mode for the continuously measurement
- Input: uint8 mode  1: pressure; 2: temperature; 3: pressure and temperature        
+ Input: uint8_t mode  1: pressure; 2: temperature; 3: pressure and temperature        
  Output: 
  Return: void
  Calls: 
  Called By: 
 *****************************************************************************/
-void spl0601_start_continuous(uint8 mode)
+void spl0601_start_continuous(uint8_t mode)
 {
     spl0601_write(HW_ADR, 0x08, mode+4);
 }
@@ -312,17 +335,14 @@ void spl0601_stop(void)
 *****************************************************************************/
 void spl0601_get_raw_temp(void)
 {
-    uint8 h,m,l;
-    SoftI2C_start();
-    SoftI2C_write_byte(HW_ADR << 1);
-    SoftI2C_write_byte(0x03);
-    SoftI2C_start();
-    SoftI2C_write_byte((HW_ADR << 1)|0x01);
-    h = SoftI2C_read_byte(0);
-    m = SoftI2C_read_byte(0);
-    l = SoftI2C_read_byte(1);
-    SoftI2C_stop();
-    p_spl0601->i32rawTemperature = (int32)h<<16 | (int32)m<<8 | (int32)l;
+    uint8_t h,m,l;
+    uint8_t regVal[3] = {0};
+    spl0601_read_multi_bytes(HW_ADR, 0x03, regVal, sizeof(regVal));
+    h = regVal[0];
+    m = regVal[1];
+    l = regVal[2];
+
+    p_spl0601->i32rawTemperature = (int32_t)h<<16 | (int32_t)m<<8 | (int32_t)l;
     p_spl0601->i32rawTemperature= (p_spl0601->i32rawTemperature&0x800000) ? (0xFF000000|p_spl0601->i32rawTemperature) : p_spl0601->i32rawTemperature;
 }
 
@@ -337,18 +357,14 @@ void spl0601_get_raw_temp(void)
 *****************************************************************************/
 void spl0601_get_raw_pressure(void)
 {
-    uint8 h,m,l;
-    SoftI2C_start();
-    SoftI2C_write_byte(HW_ADR << 1);
-    SoftI2C_write_byte(0x00);
-    SoftI2C_start();
-    SoftI2C_write_byte((HW_ADR << 1)|0x01);
-    h = SoftI2C_read_byte(0);
-    m = SoftI2C_read_byte(0);
-    l = SoftI2C_read_byte(1);
-    SoftI2C_stop();
-    
-    p_spl0601->i32rawPressure = (int32)h<<16 | (int32)m<<8 | (int32)l;
+    uint8_t h,m,l;
+    uint8_t regVal[3] = {0};
+    spl0601_read_multi_bytes(HW_ADR, 0x00, regVal, sizeof(regVal));
+    h = regVal[0];
+    m = regVal[1];
+    l = regVal[2];
+
+    p_spl0601->i32rawPressure = (int32_t)h<<16 | (int32_t)m<<8 | (int32_t)l;
     p_spl0601->i32rawPressure= (p_spl0601->i32rawPressure&0x800000) ? (0xFF000000|p_spl0601->i32rawPressure) : p_spl0601->i32rawPressure;
 }
 
@@ -396,7 +412,28 @@ float spl0601_get_pressure(void)
     return fPCompensate;
 }
 
+void spl0601_init_and_start(void)
+{
+    spl0601_init();
+    spl0601_start_continuous(CONTINUOUS_P_AND_T);
+    start = HAL_GetTick();
+}
 
+void spl0601_update_pressure(void)
+{
+    float splTemp = 0.0f;
+    float splPressure = 0.0f;
+    uint32_t airPressure = 0;
 
+    if ((HAL_GetTick() - start) > 1000) {
+        start = HAL_GetTick();
+        spl0601_get_raw_temp();
+        spl0601_get_raw_pressure();
+        splTemp = spl0601_get_temperature();
+        splPressure = spl0601_get_pressure();
+        airPressure = splPressure * 100;
+        printf("%ld: SPLtemp %.1f, pressure %.2f, intPress %ld\n", start, splTemp, splPressure, airPressure);
+    }
+}
 
 #endif
