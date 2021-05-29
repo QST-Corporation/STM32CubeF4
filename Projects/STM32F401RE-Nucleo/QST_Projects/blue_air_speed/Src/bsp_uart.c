@@ -124,8 +124,8 @@ typedef struct
 /******************************************************
  *                 Global Variables
  ******************************************************/
-bool fls110Log = false;
-bool ms4525Log = false;
+//bool fls110Log = false;
+//bool ms4525Log = false;
 bool sensorEnable = true;
 bool uartFlashCmdIsSet = false;
 
@@ -180,38 +180,19 @@ static void Error_Handler(void)
 
 void UartCmdParse(void)
 {
-  uint8_t fls110LogOff[] = "flsLogOff";
-  uint8_t fls110LogOn[] = "flsLogOn ";
-  uint8_t ms4525LogOff[] = "msLogOff ";
-  uint8_t ms4525LogOn[] = "msLogOn  ";
   uint8_t flashReadCmd[] = "flashRead";
-  uint8_t sensorStop[] = "sensorSto";
+  uint8_t sensorStop[] = "sensorStop";
+  uint8_t sensorStart[] = "sensorStart";
   printf("UartCmd: %s\n", uart_cmd_str);
-  if (memcmp(uart_cmd_str, fls110LogOff, sizeof(fls110LogOff)) == 0)
-  {
-    printf("cmd: fls110LogOff\n");
-    fls110Log = false;
-  } else if (memcmp(uart_cmd_str, fls110LogOn, sizeof(fls110LogOn)) == 0)
-  {
-    printf("cmd: fls110LogOn\n");
-    fls110Log = true;
-  } else if (memcmp(uart_cmd_str, ms4525LogOff, sizeof(ms4525LogOff)) == 0)
-  {
-    printf("cmd: ms4525LogOff\n");
-    ms4525Log = false;
-  } else if (memcmp(uart_cmd_str, ms4525LogOn, sizeof(ms4525LogOn)) == 0)
-  {
-    printf("cmd: ms4525LogOn\n");
-    ms4525Log = true;
-  } else if (memcmp(uart_cmd_str, sensorStop, sizeof(sensorStop)) == 0){
+  if (memcmp(uart_cmd_str, sensorStop, sizeof(sensorStop)-1) == 0){
     sensorEnable = false;
-  } else if (memcmp(uart_cmd_str, flashReadCmd, sizeof(flashReadCmd)) == 0)
+  } else if (memcmp(uart_cmd_str, sensorStart, sizeof(sensorStart)-1) == 0){
+    sensorEnable = true;
+  } else if (memcmp(uart_cmd_str, flashReadCmd, sizeof(flashReadCmd)-1) == 0)
   {
     uartFlashCmdIsSet = true;
   }
 
-  memset(uart_cmd_str, 0x00, sizeof(uart_cmd_str));
-  BSP_STDIO_Read(uart_cmd_str, 9);
 }
 
 /**
@@ -237,6 +218,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
 {
   //printf("HAL_UART_RxCpltCallback...\n");
   UartCmdParse();
+  memset(uart_cmd_str, 0x00, sizeof(uart_cmd_str));
+  BSP_STDIO_Read(uart_cmd_str, 12);
 }
 
 /**
@@ -249,10 +232,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
  void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)
 {
   printf("UART_Error...\n");
+  HAL_UART_AbortReceive_IT(UartHandle);
+  BSP_STDIO_Read(uart_cmd_str, 12);
 }
 
 void BSP_STDIO_Read(uint8_t *data, uint16_t size)
 {
+  __HAL_UART_ENABLE_IT(&UartStdio, UART_IT_IDLE);
   HAL_UART_Receive_IT(&UartStdio, data, size);
 }
 
@@ -434,6 +420,6 @@ void BSP_UART_Init(void)
 {
   BSP_STDIO_Init();
   BSP_COM_Init();
-  BSP_STDIO_Read(uart_cmd_str, 9);
+  BSP_STDIO_Read(uart_cmd_str, 12);
 }
 

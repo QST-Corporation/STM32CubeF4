@@ -81,7 +81,7 @@ extern void Error_Handler(void);
  *                 Global Variables
  ******************************************************/
 extern I2C_HandleTypeDef hi2c1;
-extern bool ms4525Log;
+//extern bool ms4525Log;
 
 /******************************************************
  *                 Static Variables
