@@ -432,7 +432,7 @@ void spl0601_update_pressure(float *pPress, uint32_t *pTime)
     splPressure = spl0601_get_pressure();
     *pPress = splPressure;
     *pTime = HAL_GetTick();
-    printf("%ld: SPLtemp %.1f, pressure %.2f\n", *pTime, splTemp, splPressure);
+    //printf("%ld: SPLtemp %.1f, pressure %.2f\n", *pTime, splTemp, splPressure);
 }
 
 #endif

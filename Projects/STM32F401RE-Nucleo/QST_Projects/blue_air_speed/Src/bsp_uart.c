@@ -124,8 +124,10 @@ typedef struct
 /******************************************************
  *                 Global Variables
  ******************************************************/
-bool fls110Log = true;
-bool ms4525Log = true;
+bool fls110Log = false;
+bool ms4525Log = false;
+bool sensorEnable = true;
+bool uartFlashCmdIsSet = false;
 
 /******************************************************
  *                 Static Variables
@@ -182,6 +184,8 @@ void UartCmdParse(void)
   uint8_t fls110LogOn[] = "flsLogOn ";
   uint8_t ms4525LogOff[] = "msLogOff ";
   uint8_t ms4525LogOn[] = "msLogOn  ";
+  uint8_t flashReadCmd[] = "flashRead";
+  uint8_t sensorStop[] = "sensorSto";
   printf("UartCmd: %s\n", uart_cmd_str);
   if (memcmp(uart_cmd_str, fls110LogOff, sizeof(fls110LogOff)) == 0)
   {
@@ -199,6 +203,11 @@ void UartCmdParse(void)
   {
     printf("cmd: ms4525LogOn\n");
     ms4525Log = true;
+  } else if (memcmp(uart_cmd_str, sensorStop, sizeof(sensorStop)) == 0){
+    sensorEnable = false;
+  } else if (memcmp(uart_cmd_str, flashReadCmd, sizeof(flashReadCmd)) == 0)
+  {
+    uartFlashCmdIsSet = true;
   }
 
   memset(uart_cmd_str, 0x00, sizeof(uart_cmd_str));

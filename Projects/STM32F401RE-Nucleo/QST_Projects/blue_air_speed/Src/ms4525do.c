@@ -149,7 +149,7 @@ void MS4525DO_Sensor_Update(float *pPress, uint32_t *pTime)
               /(MS4525DO_FULL_SCALE*0.8f) + MS4525DO_PMIN;
   *pPress = pressure;
   *pTime = timestamp;
-  if (ms4525Log) {
-    printf("%ld: [MS status %d], %d, %.4f, %.1f℃\n", timestamp, status, bridge, pressure, temp_degree);
-  }
+  //if (ms4525Log) {
+  //  printf("%ld: [MS status %d], %d, %.4f, %.1f℃\n", timestamp, status, bridge, pressure, temp_degree);
+  //}
 }

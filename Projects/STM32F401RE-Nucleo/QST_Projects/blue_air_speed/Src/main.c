@@ -59,6 +59,9 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 uint32_t splLastUpdateTime;
+uint8_t flashData[1040];
+extern bool sensorEnable;
+extern bool uartFlashCmdIsSet;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -150,30 +153,91 @@ static void BSP_Device_Init(void)
   BSP_UART_Init();
 }
 
+static uint16_t sampleRate = 0;
 void AirSpeedSensorsFetchData(void)
 {
   uint8_t i;
   float flsSpeed = 0.0f, flsDP = 0.0f;
   float msPress = 0.0f;
   float splPress = 0.0f;
-  uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0;
+  uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
 
-  FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsTimestamp);
+  //FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsTimestamp);
+  freshTimestamp = HAL_GetTick();
   MS4525DO_Sensor_Update(&msPress, &msTimestamp);
-  sensorsSample[0] = flsTimestamp;
+  sensorsSample[0] = freshTimestamp;
   sensorsSample[1] = (uint32_t)(flsDP*100);
   sensorsSample[2] = (uint32_t)(msPress*100);
-  if ((HAL_GetTick() - splLastUpdateTime) > 1000) {
+  if ((freshTimestamp - splLastUpdateTime) > 1000) {
     spl0601_update_pressure(&splPress, &splTimestamp);
+    splLastUpdateTime = freshTimestamp;
     sensorsSample[3] = (uint32_t)(splPress*100);
-    for (i=0; i<sizeof(sensorsSample); i++) {
+    for (i=0; i<4; i++) {
       Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
     }
+    printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
+    sampleRate = 0;
+    printf("%ld, %ld, %ld, %ld\n", sensorsSample[0], sensorsSample[1], sensorsSample[2], sensorsSample[3]);
   } else {
     for (i=0; i<3; i++) {
       Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
     }
+    sampleRate ++;
+    printf("%ld, %ld, %ld\n", sensorsSample[0], sensorsSample[1], sensorsSample[2]);
+  }
+}
+
+void UartFlashCmdPolling(void)
+{
+  uint8_t dataAvailable = 0;
+  uint32_t sensorSamples[4] = {0};
+  uint32_t splLastUpdateTime = 0, byteCnt = 0, flashByteCnt = 0;
+  uint16_t index = 0;
+  uint8_t restData[16] = {0,}; //1040-1024
+  uint8_t restDataCnt = 0;
+
+  if (uartFlashCmdIsSet){
+    printf("uartFlashCmdIsSet\n");
+    memset(flashData, 0x00, sizeof(flashData));
+    dataAvailable = Read_Data(flashData);
+    flashByteCnt = 1024;
+    memmove(&splLastUpdateTime, flashData, 4);
+    while (dataAvailable){
+      for (index=0; byteCnt+16<flashByteCnt; index++) {
+        memmove((uint8_t *)sensorSamples, &flashData[byteCnt], 12);
+        byteCnt += 12;
+        if(sensorSamples[0] - splLastUpdateTime > 1000) {
+          splLastUpdateTime = sensorSamples[0];
+          memmove((uint8_t *)&sensorSamples[3], &flashData[byteCnt], 4);
+          byteCnt += 4;
+          printf("%ld, %ld, %ld, %ld\n", sensorSamples[0], sensorSamples[1], sensorSamples[2], sensorSamples[3]);
+        } else {
+          printf("%ld, %ld, %ld\n", sensorSamples[0], sensorSamples[1], sensorSamples[2]);
+        }
+      }
+      if (byteCnt < flashByteCnt) {
+        restDataCnt = flashByteCnt - byteCnt;
+        if (restDataCnt < sizeof(restData)+1) {
+          memmove(restData, &flashData[byteCnt], restDataCnt);
+        } else {
+          printf("Flash data parse error!\n");
+          return;
+        }
+      }
+      else {
+        restDataCnt = 0;
+      }
+      printf("flashByteCnt %d, byteCnt %d, rest %d\n", flashByteCnt, byteCnt, restDataCnt);
+      HAL_Delay(100);
+      memset(flashData, 0x00, sizeof(flashData));
+      memmove(flashData, restData, restDataCnt);
+      index = 0;
+      byteCnt = 0;
+      dataAvailable = Read_Data(&flashData[restDataCnt]);
+      flashByteCnt = restDataCnt + 1024;
+    }
+    uartFlashCmdIsSet = false;
   }
 }
 
@@ -204,13 +268,18 @@ int main(void)
   Air_Speed_I2C1_Init();
   FLS110_Sensor_Init();
   spl0601_init_and_start();
+  Check_data();
   splLastUpdateTime = HAL_GetTick();
 
   /* Infinite loop */
   while (1)
   {
-    AirSpeedSensorsFetchData();
-    //HAL_Delay(1000);
+    if (sensorEnable) {
+      AirSpeedSensorsFetchData();
+      HAL_Delay(18);
+    } else {
+      UartFlashCmdPolling();
+    }
   }
 }
 
