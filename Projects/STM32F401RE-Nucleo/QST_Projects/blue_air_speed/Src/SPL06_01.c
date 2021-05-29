@@ -28,7 +28,6 @@
 extern I2C_HandleTypeDef hi2c1;
 static struct spl0601_t spl0601;
 static struct spl0601_t *p_spl0601;
-uint32_t start;
 
 HAL_StatusTypeDef spl0601_write(uint8_t hwadr, uint8_t regadr, uint8_t val);
 uint8_t spl0601_read(uint8_t hwadr, uint8_t regadr);
@@ -416,24 +415,24 @@ void spl0601_init_and_start(void)
 {
     spl0601_init();
     spl0601_start_continuous(CONTINUOUS_P_AND_T);
-    start = HAL_GetTick();
 }
 
-void spl0601_update_pressure(void)
+void spl0601_update_pressure(float *pPress, uint32_t *pTime)
 {
     float splTemp = 0.0f;
     float splPressure = 0.0f;
-    uint32_t airPressure = 0;
 
-    if ((HAL_GetTick() - start) > 1000) {
-        start = HAL_GetTick();
-        spl0601_get_raw_temp();
-        spl0601_get_raw_pressure();
-        splTemp = spl0601_get_temperature();
-        splPressure = spl0601_get_pressure();
-        airPressure = splPressure * 100;
-        printf("%ld: SPLtemp %.1f, pressure %.2f, intPress %ld\n", start, splTemp, splPressure, airPressure);
+    if ((pPress == NULL) || (pTime == NULL)) {
+      return;
     }
+
+    spl0601_get_raw_temp();
+    spl0601_get_raw_pressure();
+    splTemp = spl0601_get_temperature();
+    splPressure = spl0601_get_pressure();
+    *pPress = splPressure;
+    *pTime = HAL_GetTick();
+    printf("%ld: SPLtemp %.1f, pressure %.2f\n", *pTime, splTemp, splPressure);
 }
 
 #endif

@@ -45,7 +45,7 @@ void spl0601_get_raw_pressure(void);
 float spl0601_get_temperature(void);
 float spl0601_get_pressure(void);
 void spl0601_init_and_start(void);
-void spl0601_update_pressure(void);
+void spl0601_update_pressure(float *pPress, uint32_t *pTime);
 
 #endif
 

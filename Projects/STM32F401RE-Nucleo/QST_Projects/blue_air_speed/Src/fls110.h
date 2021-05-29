@@ -76,7 +76,7 @@ extern "C"
 void FLS_I2C1_Init(void);
 void FLS110_Sensor_Init(void);
 void FLS110_Sensor_Start(void);
-void FLS110_Sensor_Test(void);
+void FLS110_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pTime);
 
 #ifdef __cplusplus
 } /* extern "C" */

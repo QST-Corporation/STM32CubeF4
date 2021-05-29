@@ -51,12 +51,14 @@
 #include "fls110.h"
 #include "ms4525do.h"
 #include "SPL06_01.h"
+#include "flash.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
+uint32_t splLastUpdateTime;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -148,6 +150,32 @@ static void BSP_Device_Init(void)
   BSP_UART_Init();
 }
 
+void AirSpeedSensorsFetchData(void)
+{
+  uint8_t i;
+  float flsSpeed = 0.0f, flsDP = 0.0f;
+  float msPress = 0.0f;
+  float splPress = 0.0f;
+  uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0;
+  uint32_t sensorsSample[4] = {0,};
+
+  FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsTimestamp);
+  MS4525DO_Sensor_Update(&msPress, &msTimestamp);
+  sensorsSample[0] = flsTimestamp;
+  sensorsSample[1] = (uint32_t)(flsDP*100);
+  sensorsSample[2] = (uint32_t)(msPress*100);
+  if ((HAL_GetTick() - splLastUpdateTime) > 1000) {
+    spl0601_update_pressure(&splPress, &splTimestamp);
+    sensorsSample[3] = (uint32_t)(splPress*100);
+    for (i=0; i<sizeof(sensorsSample); i++) {
+      Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+    }
+  } else {
+    for (i=0; i<3; i++) {
+      Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+    }
+  }
+}
 
 /**
   * @brief  Main program
@@ -176,13 +204,12 @@ int main(void)
   Air_Speed_I2C1_Init();
   FLS110_Sensor_Init();
   spl0601_init_and_start();
+  splLastUpdateTime = HAL_GetTick();
 
   /* Infinite loop */
   while (1)
   {
-    //FLS110_Sensor_Test();
-    //MS4525DO_Sensor_Test();
-    spl0601_update_pressure();
+    AirSpeedSensorsFetchData();
     //HAL_Delay(1000);
   }
 }
