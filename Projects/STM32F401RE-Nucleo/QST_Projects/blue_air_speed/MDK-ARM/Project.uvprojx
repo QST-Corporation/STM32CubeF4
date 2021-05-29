@@ -448,6 +448,11 @@
               <FileType>1</FileType>
               <FilePath>..\Src\SPL06_01.c</FilePath>
             </File>
+            <File>
+              <FileName>flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Src\flash.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
