@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include "flash.h"
 
-#define sec4_rang 		65535
-#define sec5_rang 		131071
+#define sec4_rang 		65536
+#define sec5_rang 		131072
 
 #define Start_Addr_sec3 0x0800c000
 #define Start_Addr_sec4 0x08010000
@@ -53,21 +53,7 @@ uint8_t  erase_flag = 0;
 
 
 
-void Erase_data(void)
-{
-	erase_flag = 0;
-	sec_rang = sec4_rang;
-	rsec_rang = sec4_rang;
-	write_addr = Start_Addr_sec4;
-	read_addr = Start_Addr_sec4;
-	sec_index = 0;
-	rsec_index = 0;
-	store_addr[0] = 0;
-	store_addr[1] = 0;
-	store_addr[2] = 0;
-	store_addr[3] = 0;
-	
-}
+
 
 
 
@@ -111,6 +97,26 @@ void Flash_Write1(uint32_t WriteAddr, uint8_t *pBuffer, uint16_t NumToWrite)
 	}
 	
 	HAL_FLASH_Lock();		//上锁
+}
+
+
+
+void Erase_data(void)
+{
+	uint8_t buf[1]={0};
+	erase_flag = 0;
+	sec_rang = sec4_rang;
+	rsec_rang = sec4_rang;
+	write_addr = Start_Addr_sec4;
+	read_addr = Start_Addr_sec4;
+	sec_index = 0;
+	rsec_index = 0;
+	store_addr[0] = 0;
+	store_addr[1] = 0;
+	store_addr[2] = 0;
+	store_addr[3] = 0;
+	
+	Flash_Write1(Start_Addr_sec3,buf,1);
 }
 
 
@@ -184,6 +190,7 @@ uint8_t Check_data(void)
 		byte_to_u32data1.byte[3] = buf[16];
 		store_addr[3] = byte_to_u32data1.u32_data;
 		
+		write_addr = store_addr[sec_index];
 		printf("\n store_flag:%d,",buf[0]);
 		printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
 		return 1;
@@ -239,24 +246,16 @@ void Store_status(void)
 uint8_t tmp_d[4];
 uint8_t Store_Data(uint8_t *data,uint8_t len)
 {
-	tmp_d[0] = data[0];
-	tmp_d[1] = data[1];
-	tmp_d[2] = data[2];
-	tmp_d[3] = data[3];
-	
 	if((write_addr + len - sec_rang) <= sec_addr[sec_index])
 	{
 		
-		
-
 		Flash_Write(write_addr,data,len);
 		write_addr+=len;
-		store_addr[sec_index] = write_addr;
 		
+		store_addr[sec_index] = write_addr;
 		store_count+=len;
 		if(store_count>= 2048)
 		{
-			
 			Store_status();
 			store_count = 0;
 		}
@@ -273,7 +272,6 @@ uint8_t Store_Data(uint8_t *data,uint8_t len)
 			sec_rang = sec5_rang;
 			write_addr = sec_addr[sec_index];
 			erase_flag = 0; //clear flag
-			
 			
 			Flash_Write(write_addr,data,len);
 			write_addr+=len;
@@ -308,9 +306,10 @@ uint8_t Read_Data(uint8_t *data)
 		if((read_addr < store_addr[rsec_index]))
 		{
 			tmp_len = store_addr[rsec_index]  -  read_addr;
+			printf("\n read_addr1:0x%x,rsec_index:%d\n",read_addr,rsec_index);
 			Flash_Read(read_addr, data, tmp_len);
 			read_addr += tmp_len;	
-			printf("\n read_addr1:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+			
 			return 1;
 		}
 		
@@ -319,17 +318,19 @@ uint8_t Read_Data(uint8_t *data)
 			rsec_index++;
 			read_addr = sec_addr[rsec_index];
 			rsec_rang = sec5_rang;
+			printf("\n read_addr2:0x%x,rsec_index:%d\n",read_addr,rsec_index);
 			Flash_Read(read_addr, data, tmp_len);
 			read_addr += tmp_len;	
-			printf("\n read_addr2:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+			
 			return 1;		
 		}
 	}
 	else
 	{
+		printf("\n read_addr3:0x%x,rsec_index:%d\n",read_addr,rsec_index);
 		Flash_Read(read_addr, data, tmp_len);
 		read_addr += tmp_len;	
-		printf("\n read_addr3:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+		
 		return 1;
 	}
 	return 0;
