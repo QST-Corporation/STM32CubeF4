@@ -194,12 +194,14 @@ static fls_status_t FLS110_data_read(float *pdata)
   float flowTemp = 0.0f;
   float pressure = 0.0f, psquare = 0.0f;
   float air_speed = 0.0f;
+  uint32_t timestamp = 0;
 
   if(pdata == NULL)
   {
     return FLS_ERROR;
   }
   ret = FLS110_Reg_Read(FLS110_REG_READING, regVal, 4);
+  timestamp = HAL_GetTick();
   memmove((uint8_t *)&reading, regVal, sizeof(regVal));
   pressure = (float)reading/256;
   psquare = pressure*pressure;
@@ -217,7 +219,8 @@ static fls_status_t FLS110_data_read(float *pdata)
     air_speed = (-0.0000006f)*psquare + 0.0093f*pressure + 3.7301f;
   }
   if (fls110Log) {
-    printf("FLS110(%d), %d, %.4f, %.1f, %.1f℃\n", ret, reading, pressure, air_speed, flowTemp);
+    printf("%ld: FLS status(%d), %d, %.4f, %.1f, %.1f℃\n", timestamp, ret, reading,
+           pressure, air_speed, flowTemp);
   }
   *pdata = air_speed;
 

@@ -130,8 +130,10 @@ void MS4525DO_Sensor_Test(void)
   uint8_t databuf[4] = {0x00};
   int16_t bridge = 0, temperature = 0;
   float temp_degree = 0, pressure = 0;
+  uint32_t timestamp = 0;
 
   ret = MS4525DO_data_read(databuf);
+  timestamp = HAL_GetTick();
   if (ret  == HAL_OK) {
     temperature = ((int16_t)databuf[2] << 3) | (databuf[3] >> 5);
     bridge = ((int16_t)databuf[0] << 8) | (databuf[1]);
@@ -142,6 +144,6 @@ void MS4525DO_Sensor_Test(void)
   pressure = (((float)bridge-MS4525DO_FULL_SCALE*0.1)*(MS4525DO_PMAX-MS4525DO_PMIN))
               /(MS4525DO_FULL_SCALE*0.8) + MS4525DO_PMIN;
   if (ms4525Log) {
-    printf("[status %d], %d, %.4f, %.1f℃\n", status, bridge, pressure, temp_degree);
+    printf("%ld: [MS status %d], %d, %.4f, %.1f℃\n", timestamp, status, bridge, pressure, temp_degree);
   }
 }
