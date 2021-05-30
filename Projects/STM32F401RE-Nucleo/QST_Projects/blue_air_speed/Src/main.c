@@ -158,10 +158,11 @@ void AirSpeedSensorsFetchData(void)
 {
   uint8_t i, flashRet=0;
   float flsSpeed = 0.0f, flsDP = 0.0f;
-  float msPress = 0.0f;
+  float msPress = 0.0f, msTemp = 0.0f;
   float splPress = 0.0f;
   uint16_t msRaw = 0;
   uint32_t flsRaw = 0;
+  uint32_t msPressRawAndTemp = 0;
   uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
   static uint8_t fistRunFlag = 0;
@@ -170,13 +171,14 @@ void AirSpeedSensorsFetchData(void)
     fistRunFlag = 1;
     splLastUpdateTime = HAL_GetTick();
   }
-  //FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsRaw, &flsTimestamp);
+  FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsRaw, &flsTimestamp);
   freshTimestamp = HAL_GetTick();
-  //HAL_Delay(6);
-  //MS4525DO_Sensor_Update(&msRaw, &msPress, &msTimestamp);
+  HAL_Delay(5);
+  MS4525DO_Sensor_Update(&msRaw, &msPress, &msTemp, &msTimestamp);
+  msPressRawAndTemp = ((uint32_t)msRaw << 16 ) | (uint32_t)(msTemp*10);
   sensorsSample[0] = freshTimestamp;
   sensorsSample[1] = flsRaw;//(uint32_t)(flsDP*100);
-  sensorsSample[2] = (uint32_t)msRaw;//(msPress*100);
+  sensorsSample[2] = msPressRawAndTemp;//(msPress*100);
   if ((freshTimestamp - splLastUpdateTime) > 1000) {
     //spl0601_update_pressure(&splPress, &splTimestamp);
     splLastUpdateTime = freshTimestamp;
@@ -189,9 +191,9 @@ void AirSpeedSensorsFetchData(void)
         break;
       }
     }
-    printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
+    //printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
     sampleRate = 0;
-    printf("%ld, %ld, %ld, %ld\n", sensorsSample[0], sensorsSample[1], sensorsSample[2], sensorsSample[3]);
+    printf("%ld, %ld, %d, %.1f, %ld\n", sensorsSample[0], sensorsSample[1], msRaw, msTemp, sensorsSample[3]);
   } else {
     for (i=0; i<3; i++) {
       flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
@@ -202,7 +204,7 @@ void AirSpeedSensorsFetchData(void)
       }
     }
     sampleRate ++;
-    printf("%ld, %ld, %ld\n", sensorsSample[0], sensorsSample[1], sensorsSample[2]);
+    printf("%ld, %ld, %d, %.1f\n", sensorsSample[0], sensorsSample[1], msRaw, msTemp);
   }
 }
 
@@ -214,6 +216,8 @@ void UartFlashCmdPolling(void)
   uint16_t index = 0;
   uint8_t restData[16] = {0,}; //1040-1024
   uint8_t restDataCnt = 0;
+  uint16_t msRaw;
+  float msTemp = 0.0f;
 
   if (uartFlashCmdIsSet){
     printf("uartFlashCmdIsSet\n");
@@ -225,13 +229,15 @@ void UartFlashCmdPolling(void)
       for (index=0; byteCnt+16<flashByteCnt; index++) {
         memmove((uint8_t *)sensorSamples, &flashData[byteCnt], 12);
         byteCnt += 12;
+        msRaw = sensorSamples[2] >> 16;
+        msTemp = (float)(sensorSamples[2] & 0xFFFF)/10;
         if(sensorSamples[0] - splLastUpdateTime > 1000) {
           splLastUpdateTime = sensorSamples[0];
           memmove((uint8_t *)&sensorSamples[3], &flashData[byteCnt], 4);
           byteCnt += 4;
-          printf("%ld, %ld, %ld, %ld\n", sensorSamples[0], sensorSamples[1], sensorSamples[2], sensorSamples[3]);
+          printf("%ld, %ld, %d, %.1f, %ld\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp+0.1f, sensorSamples[3]);
         } else {
-          printf("%ld, %ld, %ld\n", sensorSamples[0], sensorSamples[1], sensorSamples[2]);
+          printf("%ld, %ld, %d, %.1f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp+0.1f);
         }
       }
       if (byteCnt < flashByteCnt) {
@@ -246,7 +252,7 @@ void UartFlashCmdPolling(void)
       else {
         restDataCnt = 0;
       }
-      printf("flashByteCnt %d, byteCnt %d, rest %d\n", flashByteCnt, byteCnt, restDataCnt);
+      //printf("flashByteCnt %d, byteCnt %d, rest %d\n", flashByteCnt, byteCnt, restDataCnt);
       HAL_Delay(100);
       memset(flashData, 0x00, sizeof(flashData));
       memmove(flashData, restData, restDataCnt);
@@ -294,7 +300,7 @@ int main(void)
   {
     if (sensorEnable) {
       AirSpeedSensorsFetchData();
-      //HAL_Delay(10);
+      HAL_Delay(10);
     } else {
       UartFlashCmdPolling();
     }

@@ -123,7 +123,7 @@ uint8_t MS4525DO_data_read(uint8_t *pdata)
   return error;
 }
 
-void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, uint32_t *pTime)
+void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, float *pTemp, uint32_t *pTime)
 {
   uint8_t ret = 0xff;
   ms_status_t status = MS_FAULT;
@@ -132,7 +132,7 @@ void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, uint32_t *pTime)
   float temp_degree = 0.0f, pressure = 0.0f;
   uint32_t timestamp = 0;
 
-  if ((raw == NULL) || (pPress == NULL) || (pTime == NULL)) {
+  if ((raw == NULL) || (pPress == NULL) || (pTemp == NULL) || (pTime == NULL)) {
     return;
   }
 
@@ -149,6 +149,7 @@ void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, uint32_t *pTime)
               /(MS4525DO_FULL_SCALE*0.8f) + MS4525DO_PMIN;
   *raw = bridge;
   *pPress = pressure;
+  *pTemp = temp_degree;
   *pTime = timestamp;
   //if (ms4525Log) {
   //  printf("%ld: [MS status %d], %d, %.4f, %.1f℃\n", timestamp, status, bridge, pressure, temp_degree);

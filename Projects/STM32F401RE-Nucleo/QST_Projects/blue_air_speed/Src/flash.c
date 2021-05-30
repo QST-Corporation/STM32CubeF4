@@ -249,8 +249,8 @@ void Store_status(void)
 	buf[20] = uint32_to_byte1.byte[3];
 	buf[21] = erase_flag;
 	Flash_Write1(Start_Addr_sec3,buf,22);
-	printf("\n store_flag:%d,",buf[0]);
-	printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
+	//printf("\n store_flag:%d,",buf[0]);
+	//printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
 }
 
 
@@ -284,7 +284,7 @@ uint8_t Store_Data(uint8_t *data,uint8_t len)
 			{
 				return 0;
 			}
-			printf("addr:%d,sec_index:%d\n",write_addr,sec_index);
+			//printf("addr:%d,sec_index:%d\n",write_addr,sec_index);
 			sec_index++;
 			sec_rang = sec5_rang;
 			write_addr = sec_addr[sec_index];
@@ -330,7 +330,7 @@ uint8_t Read_Data(uint8_t *data)
 		if((read_addr < store_addr[rsec_index]))
 		{
 			tmp_len = store_addr[rsec_index]  -  read_addr;
-			printf("\n read_addr1:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+			//printf("\n read_addr1:0x%x,rsec_index:%d\n",read_addr,rsec_index);
 			Flash_Read(read_addr, data, tmp_len);
 			read_addr += tmp_len;	
 			
@@ -350,7 +350,7 @@ uint8_t Read_Data(uint8_t *data)
 			//}
 			read_addr = sec_addr[rsec_index];
 			rsec_rang = sec5_rang;
-			printf("\n read_addr2:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
+			//printf("\n read_addr2:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
 			Flash_Read(read_addr, data, tmp_len);
 			read_addr += tmp_len;	
 			
@@ -358,7 +358,7 @@ uint8_t Read_Data(uint8_t *data)
 		}
 		else
 		{
-      printf("\n read_addr2:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
+      //printf("\n read_addr2:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
 			return 0;
 		}
 		
@@ -371,8 +371,7 @@ uint8_t Read_Data(uint8_t *data)
 			{
 				return 0;
 			}
-		//printf("\n read_addr3:0x%x,rsec_index:%d\n",read_addr,rsec_index);
-    printf("\n read_addr3:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
+    //printf("\n read_addr3:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
 		Flash_Read(read_addr, data, tmp_len);
 		read_addr += tmp_len;	
 		

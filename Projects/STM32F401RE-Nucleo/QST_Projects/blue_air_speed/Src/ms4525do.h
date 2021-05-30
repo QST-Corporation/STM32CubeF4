@@ -74,7 +74,7 @@ extern "C"
  *             Function Declarations
  ******************************************************/
 void MX_I2C1_Init(void);
-void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, uint32_t *pTime);
+void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, float *pTemp, uint32_t *pTime);
 
 #ifdef __cplusplus
 } /* extern "C" */
