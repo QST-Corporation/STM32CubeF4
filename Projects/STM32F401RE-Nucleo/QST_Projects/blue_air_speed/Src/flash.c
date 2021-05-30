@@ -202,8 +202,8 @@ uint8_t Check_data(void)
 		store_addr[3] = byte_to_u32data1.u32_data;
 		
 		write_addr = store_addr[sec_index];
-		//printf("\n store_flag:%d,",buf[0]);
-		//printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
+		printf("\n store_flag:%d,",buf[0]);
+		printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
 		return 1;
 	}
 	
@@ -249,8 +249,8 @@ void Store_status(void)
 	buf[20] = uint32_to_byte1.byte[3];
 	buf[21] = erase_flag;
 	Flash_Write1(Start_Addr_sec3,buf,22);
-	//printf("\n store_flag:%d,",buf[0]);
-	//printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
+	printf("\n store_flag:%d,",buf[0]);
+	printf("sec_index:%d,store_addr[0]:0x%x,store_addr[1]:0x%x,store_addr[2]:0x%x,store_addr[3]:0x%x\n",sec_index,store_addr[0],store_addr[1],store_addr[2],store_addr[3]);	
 }
 
 
@@ -259,7 +259,10 @@ uint8_t Store_Data(uint8_t *data,uint8_t len)
 {
 	if((write_addr + len - sec_rang) <= sec_addr[sec_index])
 	{
-		
+		if(write_addr > 0x0807FFFF)
+		{
+			return 0;
+		}
 		Flash_Write(write_addr,data,len);
 		write_addr+=len;
 		
@@ -275,10 +278,13 @@ uint8_t Store_Data(uint8_t *data,uint8_t len)
 	}
 	else
 	{
-		if(sec_index < 4)
+		if(sec_index < 3)
 		{
-			
-			//printf("addr:%d,sec_index:%d\n",write_addr,sec_index);
+			if(write_addr > 0x0807FFFF)
+			{
+				return 0;
+			}
+			printf("addr:%d,sec_index:%d\n",write_addr,sec_index);
 			sec_index++;
 			sec_rang = sec5_rang;
 			write_addr = sec_addr[sec_index];
@@ -307,17 +313,24 @@ uint8_t Store_Data(uint8_t *data,uint8_t len)
 	
 
 
+uint32_t tmpaddr;
 uint8_t Read_Data(uint8_t *data)
 {
 	//if(write_addr == Start_Addr_sec4) return 0;
 
 	uint16_t tmp_len = 1024;
+	
+	tmpaddr = read_addr + 1024;
 	if((read_addr + 1024) >= store_addr[rsec_index])
 	{
+		if(read_addr > 0x0807FFFF)
+		{
+			return 0;
+		}
 		if((read_addr < store_addr[rsec_index]))
 		{
 			tmp_len = store_addr[rsec_index]  -  read_addr;
-			//printf("\n read_addr1:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+			printf("\n read_addr1:0x%x,rsec_index:%d\n",read_addr,rsec_index);
 			Flash_Read(read_addr, data, tmp_len);
 			read_addr += tmp_len;	
 			
@@ -326,24 +339,51 @@ uint8_t Read_Data(uint8_t *data)
 		
 		if(rsec_index < sec_index)
 		{
-			rsec_index++;
+			if(read_addr > 0x0807FFFF)
+			{
+				return 0;
+			}
+			//if(rsec_index < 3) {
+				rsec_index++;
+			//} else {
+				//return 0;
+			//}
 			read_addr = sec_addr[rsec_index];
 			rsec_rang = sec5_rang;
-			//printf("\n read_addr2:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+			printf("\n read_addr2:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
 			Flash_Read(read_addr, data, tmp_len);
 			read_addr += tmp_len;	
 			
-			return 1;		
+			return 1;
 		}
+		else
+		{
+      printf("\n read_addr2:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
+			return 0;
+		}
+		
 	}
 	else
 	{
+		//if(rsec_index < sec_index)
+		//{
+			if(read_addr > 0x0807FFFF)
+			{
+				return 0;
+			}
 		//printf("\n read_addr3:0x%x,rsec_index:%d\n",read_addr,rsec_index);
+    printf("\n read_addr3:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
 		Flash_Read(read_addr, data, tmp_len);
 		read_addr += tmp_len;	
 		
 		return 1;
+		//}
+		//else
+		//{
+      //printf("\n read_addr3:0x%x,rsec_index:%d, sec_index:%d\n",read_addr,rsec_index, sec_index);
+			//return 0;
+		//}
 	}
-	return 0;
+	//return 0;
 	
 }

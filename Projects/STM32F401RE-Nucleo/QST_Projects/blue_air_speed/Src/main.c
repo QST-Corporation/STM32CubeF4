@@ -170,10 +170,10 @@ void AirSpeedSensorsFetchData(void)
     fistRunFlag = 1;
     splLastUpdateTime = HAL_GetTick();
   }
-  FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsRaw, &flsTimestamp);
+  //FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsRaw, &flsTimestamp);
   freshTimestamp = HAL_GetTick();
-  HAL_Delay(6);
-  MS4525DO_Sensor_Update(&msRaw, &msPress, &msTimestamp);
+  //HAL_Delay(6);
+  //MS4525DO_Sensor_Update(&msRaw, &msPress, &msTimestamp);
   sensorsSample[0] = freshTimestamp;
   sensorsSample[1] = flsRaw;//(uint32_t)(flsDP*100);
   sensorsSample[2] = (uint32_t)msRaw;//(msPress*100);
@@ -294,7 +294,7 @@ int main(void)
   {
     if (sensorEnable) {
       AirSpeedSensorsFetchData();
-      HAL_Delay(10);
+      //HAL_Delay(10);
     } else {
       UartFlashCmdPolling();
     }

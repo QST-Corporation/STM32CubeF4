@@ -126,7 +126,7 @@ typedef struct
  ******************************************************/
 //bool fls110Log = false;
 //bool ms4525Log = false;
-bool sensorEnable = true;
+bool sensorEnable = false;
 bool uartFlashCmdIsSet = false;
 
 /******************************************************
