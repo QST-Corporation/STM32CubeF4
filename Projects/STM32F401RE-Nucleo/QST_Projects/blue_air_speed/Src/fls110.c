@@ -186,7 +186,7 @@ static fls_status_t FLS110_pflow_read(float *pdata)
   return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
 }
 
-static fls_status_t FLS110_data_read(float *pSpeed, float *pDp, uint32_t *pTime)
+static fls_status_t FLS110_data_read(float *pSpeed, float *pDp, uint32_t *pRaw, uint32_t *pTime)
 {
   HAL_StatusTypeDef ret;
   uint8_t	regVal[4]={0}, regTemp[2]={0};
@@ -196,7 +196,7 @@ static fls_status_t FLS110_data_read(float *pSpeed, float *pDp, uint32_t *pTime)
   float air_speed = 0.0f;
   uint32_t timestamp = 0;
 
-  if((pSpeed == NULL) || (pDp == NULL) || (pTime == NULL))
+  if((pSpeed == NULL) || (pDp == NULL) || (pRaw == NULL) || (pTime == NULL))
   {
     return FLS_ERROR;
   }
@@ -224,6 +224,7 @@ static fls_status_t FLS110_data_read(float *pSpeed, float *pDp, uint32_t *pTime)
   //}
   *pSpeed = air_speed;
   *pDp = pressure;
+  *pRaw = reading;
   *pTime = timestamp;
 
   return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
@@ -353,18 +354,18 @@ void FLS110_Sensor_Init(void)
   FLS110_Sensor_Start();
 }
 
-void FLS110_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pTime)
+void FLS110_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pRaw, uint32_t *pTime)
 {
   //float air_speed = 0.0f;
   //float pflow = 0.0f;
 
-  if((pSpeed == NULL) || (pDp == NULL) || (pTime == NULL))
+  if((pSpeed == NULL) || (pDp == NULL) || (pRaw == NULL) || (pTime == NULL))
   {
     return;
   }
 
   if(FLS110_Get_Ready() == FLS_READY){
-    FLS110_data_read(pSpeed, pDp, pTime);
+    FLS110_data_read(pSpeed, pDp, pRaw, pTime);
   }
   //FLS110_pflow_read(&pflow);
 }

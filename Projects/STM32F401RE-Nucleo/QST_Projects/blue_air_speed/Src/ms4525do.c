@@ -123,7 +123,7 @@ uint8_t MS4525DO_data_read(uint8_t *pdata)
   return error;
 }
 
-void MS4525DO_Sensor_Update(float *pPress, uint32_t *pTime)
+void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, uint32_t *pTime)
 {
   uint8_t ret = 0xff;
   ms_status_t status = MS_FAULT;
@@ -132,7 +132,7 @@ void MS4525DO_Sensor_Update(float *pPress, uint32_t *pTime)
   float temp_degree = 0.0f, pressure = 0.0f;
   uint32_t timestamp = 0;
 
-  if ((pPress == NULL) || (pTime == NULL)) {
+  if ((raw == NULL) || (pPress == NULL) || (pTime == NULL)) {
     return;
   }
 
@@ -147,6 +147,7 @@ void MS4525DO_Sensor_Update(float *pPress, uint32_t *pTime)
   temp_degree = (float)temperature*200/2047 - 50; //came from datasheet page4/14
   pressure = (((float)bridge-MS4525DO_FULL_SCALE*0.1f)*(MS4525DO_PMAX-MS4525DO_PMIN))
               /(MS4525DO_FULL_SCALE*0.8f) + MS4525DO_PMIN;
+  *raw = bridge;
   *pPress = pressure;
   *pTime = timestamp;
   //if (ms4525Log) {

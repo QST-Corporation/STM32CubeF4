@@ -156,32 +156,50 @@ static void BSP_Device_Init(void)
 static uint16_t sampleRate = 0;
 void AirSpeedSensorsFetchData(void)
 {
-  uint8_t i;
+  uint8_t i, flashRet=0;
   float flsSpeed = 0.0f, flsDP = 0.0f;
   float msPress = 0.0f;
   float splPress = 0.0f;
+  uint16_t msRaw = 0;
+  uint32_t flsRaw = 0;
   uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
+  static uint8_t fistRunFlag = 0;
 
-  //FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsTimestamp);
+  if (fistRunFlag == 0) {
+    fistRunFlag = 1;
+    splLastUpdateTime = HAL_GetTick();
+  }
+  FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsRaw, &flsTimestamp);
   freshTimestamp = HAL_GetTick();
-  MS4525DO_Sensor_Update(&msPress, &msTimestamp);
+  HAL_Delay(6);
+  MS4525DO_Sensor_Update(&msRaw, &msPress, &msTimestamp);
   sensorsSample[0] = freshTimestamp;
-  sensorsSample[1] = (uint32_t)(flsDP*100);
-  sensorsSample[2] = (uint32_t)(msPress*100);
+  sensorsSample[1] = flsRaw;//(uint32_t)(flsDP*100);
+  sensorsSample[2] = (uint32_t)msRaw;//(msPress*100);
   if ((freshTimestamp - splLastUpdateTime) > 1000) {
-    spl0601_update_pressure(&splPress, &splTimestamp);
+    //spl0601_update_pressure(&splPress, &splTimestamp);
     splLastUpdateTime = freshTimestamp;
     sensorsSample[3] = (uint32_t)(splPress*100);
     for (i=0; i<4; i++) {
-      Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+      flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+      if (flashRet == 0) {
+        sensorEnable = false;
+        printf("Store_Data: 0\n");
+        break;
+      }
     }
     printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
     sampleRate = 0;
     printf("%ld, %ld, %ld, %ld\n", sensorsSample[0], sensorsSample[1], sensorsSample[2], sensorsSample[3]);
   } else {
     for (i=0; i<3; i++) {
-      Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+      flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+      if (flashRet == 0) {
+        sensorEnable = false;
+        printf("Store_Data: 0\n");
+        break;
+      }
     }
     sampleRate ++;
     printf("%ld, %ld, %ld\n", sensorsSample[0], sensorsSample[1], sensorsSample[2]);
@@ -269,14 +287,14 @@ int main(void)
   FLS110_Sensor_Init();
   spl0601_init_and_start();
   Check_data();
-  splLastUpdateTime = HAL_GetTick();
+  //splLastUpdateTime = HAL_GetTick();
 
   /* Infinite loop */
   while (1)
   {
     if (sensorEnable) {
       AirSpeedSensorsFetchData();
-      HAL_Delay(18);
+      HAL_Delay(10);
     } else {
       UartFlashCmdPolling();
     }
