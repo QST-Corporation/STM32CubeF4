@@ -81,6 +81,8 @@ int BSP_COM_Read(uint8_t* data_in, uint32_t expected_data_size, uint32_t timeout
 //void BSP_COM_IRQHandler(void);
 void BSP_UART_Init(void);
 void BSP_STDIO_Read(uint8_t *data, uint16_t size);
+void BSP_Button_Init(void);
+void BSP_Button_Polling(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

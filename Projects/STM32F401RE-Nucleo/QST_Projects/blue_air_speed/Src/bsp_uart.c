@@ -126,7 +126,7 @@ typedef struct
  ******************************************************/
 //bool fls110Log = false;
 //bool ms4525Log = false;
-bool sensorEnable = false;
+volatile bool sensorEnable = false;
 bool uartFlashCmdIsSet = false;
 
 /******************************************************
@@ -423,3 +423,48 @@ void BSP_UART_Init(void)
   BSP_STDIO_Read(uart_cmd_str, 12);
 }
 
+void BSP_Button_Init(void)
+{
+  GPIO_InitTypeDef  GPIO_InitStruct;
+
+  /*Configure GPIO pin : B1_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+}
+
+void BSP_Button_Polling(void)
+{
+  GPIO_PinState buttonStatus;
+  bool buttonUnPressed = true;
+  uint32_t pressedFreshTime = 0;
+
+  buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+
+  if(buttonStatus == GPIO_PIN_RESET)
+  {
+    //printf("b1 puch.....\n");
+    HAL_Delay(10);
+    if ((buttonUnPressed) && (buttonStatus == GPIO_PIN_RESET)) {
+      pressedFreshTime = HAL_GetTick();
+      buttonUnPressed = false;
+      if (sensorEnable) {
+        //sensorEnable = false;
+      } else {
+        sensorEnable = true;
+      }
+    }//else if((HAL_GetTick() - pressedFreshTime) > 2000){
+     //   printf("long Press\n");
+     //   sensorEnable = false;
+     //   Erase_data();
+    //}
+  } else {
+    HAL_Delay(10);
+    if(buttonStatus == GPIO_PIN_SET) {
+      buttonUnPressed = true;
+    }
+  }
+}

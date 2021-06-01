@@ -60,7 +60,7 @@
 /* Private variables ---------------------------------------------------------*/
 uint32_t splLastUpdateTime;
 uint8_t flashData[1040];
-extern bool sensorEnable;
+extern volatile bool sensorEnable;
 extern bool uartFlashCmdIsSet;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -146,6 +146,8 @@ static void SystemClock_Config(void)
 
 static void BSP_Device_Init(void)
 {
+  BSP_Button_Init();
+
   /* Configure LED2 */
   BSP_LED_Init(LED2);
 
@@ -180,7 +182,7 @@ void AirSpeedSensorsFetchData(void)
   sensorsSample[1] = flsRaw;//(uint32_t)(flsDP*100);
   sensorsSample[2] = msPressRawAndTemp;//(msPress*100);
   if ((freshTimestamp - splLastUpdateTime) > 1000) {
-    //spl0601_update_pressure(&splPress, &splTimestamp);
+    spl0601_update_pressure(&splPress, &splTimestamp);
     splLastUpdateTime = freshTimestamp;
     sensorsSample[3] = (uint32_t)(splPress*100);
     for (i=0; i<4; i++) {
@@ -235,9 +237,9 @@ void UartFlashCmdPolling(void)
           splLastUpdateTime = sensorSamples[0];
           memmove((uint8_t *)&sensorSamples[3], &flashData[byteCnt], 4);
           byteCnt += 4;
-          printf("%ld, %ld, %d, %.1f, %ld\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp+0.1f, sensorSamples[3]);
+          printf("%ld, %ld, %d, %.1f, %.2f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/, ((float)sensorSamples[3]/100));
         } else {
-          printf("%ld, %ld, %d, %.1f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp+0.1f);
+          printf("%ld, %ld, %d, %.1f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/);
         }
       }
       if (byteCnt < flashByteCnt) {
@@ -304,6 +306,7 @@ int main(void)
     } else {
       UartFlashCmdPolling();
     }
+    BSP_Button_Polling();
   }
 }
 
