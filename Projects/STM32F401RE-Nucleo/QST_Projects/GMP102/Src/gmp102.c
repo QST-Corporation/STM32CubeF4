@@ -436,7 +436,7 @@ int8_t gmp102_measure_T(int16_t* ps16T){
 	
   // Get the calibrated temperature in code
   *ps16T = (u8Data[0] << 8) + u8Data[1];
-printf("gmp102_measure_T, u8Data[0]= 0x%x,u8Data[1]= 0x%x\n",u8Data[0],u8Data[1]);	
+  //printf("gmp102_measure_T, u8Data[0]= 0x%x,u8Data[1]= 0x%x\n",u8Data[0],u8Data[1]);	
  EXIT:
   return comRslt;
 }
@@ -884,11 +884,11 @@ void GMP102_Sensor_Test(void)
 
   /* Measure P */
   s8Res = gmp102_measure_P(&s32P);
-  printf("P(code)=%d\r", s32P);
+  //printf("P(code)=%d\r", s32P);
 
   /* Mesaure T */
   s8Res = gmp102_measure_T(&s16T);
-  printf("T(code)=%d\r", s16T);
+  //printf("T(code)=%d\r", s16T);
 
   /* Compensation */
 #ifdef FLOAT_SUPPORT
@@ -898,10 +898,11 @@ void GMP102_Sensor_Test(void)
   gmp102_compensation_fixed_point_s64(s16T, s32P, s16Value, u8Power, &s32T_Celsius, &s32P_Pa);
 
 #endif
-  printf("P(Pa)=%f, %d\r", fP_Pa, s32P);
-  printf("T(C)=%f, %f\r", fT_Celsius, s32T_Celsius/256.0);
+  //printf("P(Pa)=%f, %d\r", fP_Pa, s32P);
+  //printf("T(C)=%f, %f\r", fT_Celsius, s32T_Celsius/256.0);
 
   /* Pressure Altitude */
   fAlt_m = pressure2Alt(fP_Pa);
-  printf("Alt(m)=%f\r", fAlt_m);
+  //printf("Alt(m)=%f\r", fAlt_m);
+  printf("%f, %f, %f\n", fP_Pa, fT_Celsius, fAlt_m);
 }
