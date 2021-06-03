@@ -864,8 +864,8 @@ void gmp102_init(void)
   s8Res = gmp102_initialization();
 
   //设置采样时间，缩短单次转化时间
-  //gmp102_set_P_OSR(GMP102_P_OSR_256);//1.54ms
-  //gmp102_set_T_OSR(GMP102_T_OSR_256);//1.54ms
+  gmp102_set_P_OSR(GMP102_P_OSR_32768);//42.18ms
+  gmp102_set_T_OSR(GMP102_T_OSR_32768);//42.18ms
 
   /* set sea level reference pressure */
   //If not set, use default 101325 Pa for pressure altitude calculation
