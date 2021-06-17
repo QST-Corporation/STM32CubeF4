@@ -67,10 +67,11 @@
 #define GXHTC3_WAKEUP_CMD             0x3517
 #define GXHTC3_SLEEP_CMD              0xB098
 #define GXHTC3_NORMAL_READ_T_CMD      0x7CA2  //clock stretching disabled: 0x7866
-#define GXHTC3_NORMAL_READ_RH_CMD     0x5C24  //clock stretching disabled: 0x58E0
+#define GXHTC3_NORMAL_READ_RH_CMD     0x58E0//0x5C24  //clock stretching disabled: 0x58E0
 #define GXHTC3_SW_RESET_CMD           0x805D
 #define GXHTC3_READ_ID_CMD            0xEFC8
 #define GXHTC3_ID                     0xFFFF //TBD
+#define CRC_POLYNOMIAL                0x131 // P(x) = x^8 + x^5 + x^4 + 1 = 100110001
 
 typedef enum {
   GXHTC_MODE_WAKEUP    = GXHTC3_WAKEUP_CMD,
@@ -211,18 +212,48 @@ static gxhtc_status_t Gxhtc3_Start_Measurement(gxhtc_meas_mode_t mode)
   return ret == HAL_OK? GXHTC_SUCCESS : GXHTC_ERROR;
 }
 
+//------------------------------------------------------------------------------
+static gxhtc_status_t Gxhtc3_CheckCrc(uint8_t data[], uint8_t nbrOfBytes,
+                              uint8_t checksum){
+  uint8_t bit;        // bit mask
+  uint8_t crc = 0xFF; // calculated checksum
+  uint8_t byteCtr;    // byte counter
+
+  // calculates 8-Bit checksum with given polynomial
+  for(byteCtr = 0; byteCtr < nbrOfBytes; byteCtr++) {
+    crc ^= (data[byteCtr]);
+    for(bit = 8; bit > 0; --bit) {
+      if(crc & 0x80) {
+        crc = (crc << 1) ^ CRC_POLYNOMIAL;
+      } else {
+        crc = (crc << 1);
+      }
+    }
+  }
+
+  // verify checksum
+  if(crc != checksum) {
+    return GXHTC_ERROR;
+  } else {
+    return GXHTC_SUCCESS;
+  }
+}
+
 static gxhtc_status_t Gxhtc3_Check_Device_Presence(void)
 {
-  uint8_t regVal[3] = {0,};
+  uint8_t regVal[3] = {0,}, IdCrc=0;
   uint16_t gxhtc3_id = 0;
+  gxhtc_status_t err = GXHTC_SUCCESS;
 
   Gxhtc3_Cmd_Transmit(GXHTC3_READ_ID_CMD);
   HAL_Delay(1);
   Gxhtc3_Reg_Read(regVal, 3);
-  gxhtc3_id = ((uint16_t)regVal[2]<<8)|regVal[1];
-  printf("Readout ID 0x%02X\n", gxhtc3_id);
+  gxhtc3_id = ((uint16_t)regVal[0]<<8)|regVal[1];
+  IdCrc = regVal[2];
+  err = Gxhtc3_CheckCrc(regVal, 2, IdCrc);
+  printf("Readout ID 0x%02X, CRC check: %d\n", gxhtc3_id, err);
 
-  if(gxhtc3_id == GXHTC3_ID) {
+  if((gxhtc3_id == GXHTC3_ID) && (err == GXHTC_SUCCESS)) {
     printf("Sensor GXHTC3 exist\n");
     return GXHTC_SUCCESS;
   } else {
@@ -243,10 +274,10 @@ void Gxhtc3_Sensor_Init(void)
 
 void Gxhtc3_Sensor_Test(void)
 {
-  gxhtc_status_t ret;
+  gxhtc_status_t ret, err = GXHTC_SUCCESS;
   uint8_t regVal[6] = {0};
   uint16_t rhRaw = 0, tempRaw = 0;
-  float humidity = 0, temperture = 0;
+  float humidity = 0, temperature = 0;
   uint8_t rh_crc=0, temp_crc=0;
 
   //1, wakeup
@@ -254,22 +285,30 @@ void Gxhtc3_Sensor_Test(void)
   HAL_Delay(1);
   //2, measurement
   Gxhtc3_Start_Measurement(GXHTC_MEAS_NORMAL_RH_FIRST);
-  HAL_Delay(1);
+  HAL_Delay(20);// polling, wait for measurement ready.
 
   //3, readout data
   ret = Gxhtc3_Reg_Read(regVal, 6);
   if (ret == GXHTC_SUCCESS) {
     rhRaw = ((uint16_t)regVal[0]<<8)|regVal[1];
     rh_crc = regVal[2];
+    err |= Gxhtc3_CheckCrc(regVal, 2, rh_crc);
+    //printf("RH CRC check: %d\n", err);
     tempRaw = ((uint16_t)regVal[3]<<8)|regVal[4];
     temp_crc = regVal[5];
+    err |= Gxhtc3_CheckCrc(&regVal[3], 2, temp_crc);
+    //printf("Temp CRC check: %d\n", err);
 
-    humidity = (100.0f*rhRaw)/pow(2,16); //refer to spec p9
-    temperture = (175.0f*tempRaw)/pow(2,16) - 45; //refer to spec p9
+    if (err == GXHTC_SUCCESS) {
+      // 100*RHRaw/pow(2,16)
+      humidity = (100.0f*(float)rhRaw)/65536.0f; //refer to spec p9
+      // 175*TempRaw/pow(2,16) -45
+      temperature = (175.0f*(float)tempRaw)/65536.0f - 45.0f; //refer to spec p9
+    }
   }
 
   //4, sleep
   Gxhtc3_Set_Mode(GXHTC_MODE_SLEEP);
 
-  printf("humidity %d, %f, temp %d, %.1f\n", rhRaw, humidity, tempRaw, temperture);
+  printf("humidity %d, %f, temp %d, %.2f\n", rhRaw, humidity, tempRaw, temperature);
 }

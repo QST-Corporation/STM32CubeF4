@@ -175,7 +175,7 @@ int main(void)
   while (1)
   {
     Gxhtc3_Sensor_Test();
-    HAL_Delay(10);
+    HAL_Delay(1000);
   }
 }
 
