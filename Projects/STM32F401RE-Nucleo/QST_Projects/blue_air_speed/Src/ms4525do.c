@@ -33,8 +33,8 @@
 /******************************************************************************
  * @file    ms4525do.c
  * @author  QST AE team
- * @version V0.2
- * @date    2021-05-28
+ * @version V0.3
+ * @date    2021-08-31
  * @id      $Id$
  * @brief   This file provides the functions for TE MS4525DO sensor evaluation.
  *          |----------------------|
@@ -59,19 +59,19 @@
  *                      Macros
  ******************************************************/
 //#define __weak __attribute__((weak))
-#define PARTNUMBER                    MS4525DO_DS_5AI_0001_D //Supply 5V, A type, range 20 psi, 
+#define PARTNUMBER                    MS4525DO_DS_5AI_0001_D //Supply 5V, A type, range ±1 psi, 
 #define I2C_SLAVE_ADDR                0x28//0x28,0x36,0x46
 #define I2C_SLAVE_ADDR_READ           ((I2C_SLAVE_ADDR<<1)|1)
 #define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)
 #define MS4525DO_TIMEOUT              0xFF //I2C operation timout in ms
-#define MS4525DO_PMAX                 18//20*90%, Range 20psi
-#define MS4525DO_PMIN                 2 //20*10%
+//#define MS4525DO_PMAX                 1.0f//20*90%, Range 20psi
+//#define MS4525DO_PMIN                 -1.0f //20*10%
 #define MS4525DO_FULL_SCALE           (float)16383 //14bit
 
 typedef enum {
   MS_NORMAL_GOOD,
   MS_RESERVED,
-  MS_STATE_DATA,
+  MS_STALE_DATA,
   MS_FAULT
 }ms_status_t;
 
@@ -128,8 +128,11 @@ void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, float *pTemp, uint32_t
   uint8_t ret = 0xff;
   ms_status_t status = MS_FAULT;
   uint8_t databuf[4] = {0x00};
-  int16_t bridge = 0, temperature = 0;
-  float temp_degree = 0.0f, pressure = 0.0f;
+  const float P_min = -1.0f;
+  const float P_max = 1.0f;
+  const float PSI_to_Pa = 6894.757f;
+  int16_t dp_raw = 0, temp_raw = 0;
+  float temperature = 0, dp_psi = 0, dp_pa = 0;
   uint32_t timestamp = 0;
 
   if ((raw == NULL) || (pPress == NULL) || (pTemp == NULL) || (pTime == NULL)) {
@@ -137,21 +140,44 @@ void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, float *pTemp, uint32_t
   }
 
   ret = MS4525DO_data_read(databuf);
-  timestamp = HAL_GetTick();
-  if (ret  == HAL_OK) {
-    temperature = ((int16_t)databuf[2] << 3) | (databuf[3] >> 5);
-    bridge = ((int16_t)databuf[0] << 8) | (databuf[1]);
-    status = (ms_status_t)(databuf[0] >> 5);
+
+  //status bits conditions indicated by the 2 MSBs (Bit[15:14] of I2C data packet
+  status = (ms_status_t)(databuf[0] >> 6);
+  if ((ret != HAL_OK) || (status != MS_NORMAL_GOOD))
+  {
+    printf("ERROR[TE]: I2C ret %d, MS status %d\r\n", ret, status);
+    return;
   }
 
-  temp_degree = (float)temperature*200/2047 - 50; //came from datasheet page4/14
-  pressure = (((float)bridge-MS4525DO_FULL_SCALE*0.1f)*(MS4525DO_PMAX-MS4525DO_PMIN))
-              /(MS4525DO_FULL_SCALE*0.8f) + MS4525DO_PMIN;
-  *raw = bridge;
-  *pPress = pressure;
-  *pTemp = temp_degree;
+  timestamp = HAL_GetTick();
+
+  //Bit[13:0] 14-bit bridge data
+  dp_raw = (databuf[0] << 8) + databuf[1];
+  dp_raw = 0x3FFF & dp_raw;
+
+  //Bit[15:5] 11-bit corrected temperature data
+  temp_raw = (databuf[2] << 8) + databuf[3];
+  temp_raw = (0xFFE0 & temp_raw) >> 5;
+
+  /*
+    this equation is an inversion of the equation in the
+    pressure transfer function figure on page 4 of the datasheet
+
+    We negate the result so that positive differential pressures
+    are generated when the bottom port is used as the static
+    port on the pitot and top port is used as the dynamic port
+    */
+  dp_psi = -((dp_raw - 0.1f*MS4525DO_FULL_SCALE) * (P_max - P_min)
+              /(0.8f*MS4525DO_FULL_SCALE) + P_min);
+  dp_pa = dp_psi * PSI_to_Pa;
+
+  temperature = (float)temp_raw*200/2047 - 50; //came from datasheet page4/14
+
+  *raw = dp_raw;
+  *pPress = dp_pa;
+  *pTemp = temperature;
   *pTime = timestamp;
   //if (ms4525Log) {
-  //  printf("%ld: [MS status %d], %d, %.4f, %.1f℃\n", timestamp, status, bridge, pressure, temp_degree);
+  //  printf("%ld: [TE(%d)], %d, %.2f, %.1f℃\n", timestamp, status, dp_raw, dp_pa, temperature);
   //}
 }
