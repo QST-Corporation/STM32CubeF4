@@ -61,7 +61,7 @@
 uint32_t splLastUpdateTime;
 uint8_t flashData[1040];
 extern volatile bool sensorEnable;
-extern bool uartFlashCmdIsSet;
+extern bool uartFlashReadCmd;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -167,7 +167,7 @@ void AirSpeedSensorsFetchData(void)
   uint32_t msPressRawAndTemp = 0;
   uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
-  static uint8_t fistRunFlag = 0;
+  static uint8_t fistRunFlag = 0, sensorDataLen = 0;
 
   if (fistRunFlag == 0) {
     fistRunFlag = 1;
@@ -185,32 +185,30 @@ void AirSpeedSensorsFetchData(void)
     spl0601_update_pressure(&splPress, &splTimestamp);
     splLastUpdateTime = freshTimestamp;
     sensorsSample[3] = (uint32_t)(splPress*100);
-    for (i=0; i<4; i++) {
-      flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
-      if (flashRet == 0) {
-        sensorEnable = false;
-        printf("Store_Data: 0\n");
-        break;
-      }
-    }
+    sensorDataLen = 4;
     //printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
     sampleRate = 0;
-    printf("%ld, %ld, %d, %.1f, %ld\n", sensorsSample[0], sensorsSample[1], msRaw, msTemp, sensorsSample[3]);
+    printf("%ld, %ld, %.2f, %d, %.2f, %.1f, %.2f\n", 
+            freshTimestamp, flsRaw, flsDP, msRaw, msPress, msTemp, splPress);
   } else {
-    for (i=0; i<3; i++) {
-      flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
-      if (flashRet == 0) {
-        sensorEnable = false;
-        printf("Store_Data: 0\n");
-        break;
-      }
-    }
+    sensorDataLen = 3;
     sampleRate ++;
-    printf("%ld, %ld, %d, %.1f\n", sensorsSample[0], sensorsSample[1], msRaw, msTemp);
+    printf("%ld, %ld, %.2f, %d, %.2f, %.1f\n", 
+            freshTimestamp, flsRaw, flsDP, msRaw, msPress, msTemp);
+  }
+
+  //store sensor data to flash:
+  for (i=0; i<sensorDataLen; i++) {
+    flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
+    if (flashRet == 0) {
+      sensorEnable = false;
+      printf("Store_Data: 0\n");
+      break;
+    }
   }
 }
 
-void UartFlashCmdPolling(void)
+void UartFlashReadHanlder(void)
 {
   uint8_t dataAvailable = 0;
   uint32_t sensorSamples[4] = {0};
@@ -221,49 +219,46 @@ void UartFlashCmdPolling(void)
   uint16_t msRaw;
   float msTemp = 0.0f;
 
-  if (uartFlashCmdIsSet){
-    printf("uartFlashCmdIsSet\n");
-    memset(flashData, 0x00, sizeof(flashData));
-    dataAvailable = Read_Data(flashData);
-    flashByteCnt = 1024;
-    memmove(&splLastUpdateTime, flashData, 4);
-    while (dataAvailable){
-      for (index=0; byteCnt+16<flashByteCnt; index++) {
-        memmove((uint8_t *)sensorSamples, &flashData[byteCnt], 12);
-        byteCnt += 12;
-        msRaw = sensorSamples[2] >> 16;
-        msTemp = (float)(sensorSamples[2] & 0xFFFF)/10;
-        if(sensorSamples[0] - splLastUpdateTime > 1000) {
-          splLastUpdateTime = sensorSamples[0];
-          memmove((uint8_t *)&sensorSamples[3], &flashData[byteCnt], 4);
-          byteCnt += 4;
-          printf("%ld, %ld, %d, %.1f, %.2f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/, ((float)sensorSamples[3]/100));
-        } else {
-          printf("%ld, %ld, %d, %.1f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/);
-        }
+  //printf("uartFlashReadCmd\n");
+  memset(flashData, 0x00, sizeof(flashData));
+  dataAvailable = Read_Data(flashData);
+  flashByteCnt = 1024;
+  memmove(&splLastUpdateTime, flashData, 4);
+  while (dataAvailable){
+    for (index=0; byteCnt+16<flashByteCnt; index++) {
+      memmove((uint8_t *)sensorSamples, &flashData[byteCnt], 12);
+      byteCnt += 12;
+      msRaw = sensorSamples[2] >> 16;
+      msTemp = (float)(sensorSamples[2] & 0xFFFF)/10;
+      if(sensorSamples[0] - splLastUpdateTime > 1000) {
+        splLastUpdateTime = sensorSamples[0];
+        memmove((uint8_t *)&sensorSamples[3], &flashData[byteCnt], 4);
+        byteCnt += 4;
+        printf("%ld, %ld, %d, %.1f, %.2f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/, ((float)sensorSamples[3]/100));
+      } else {
+        printf("%ld, %ld, %d, %.1f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/);
       }
-      if (byteCnt < flashByteCnt) {
-        restDataCnt = flashByteCnt - byteCnt;
-        if (restDataCnt < sizeof(restData)+1) {
-          memmove(restData, &flashData[byteCnt], restDataCnt);
-        } else {
-          printf("Flash data parse error!\n");
-          return;
-        }
-      }
-      else {
-        restDataCnt = 0;
-      }
-      //printf("flashByteCnt %d, byteCnt %d, rest %d\n", flashByteCnt, byteCnt, restDataCnt);
-      HAL_Delay(100);
-      memset(flashData, 0x00, sizeof(flashData));
-      memmove(flashData, restData, restDataCnt);
-      index = 0;
-      byteCnt = 0;
-      dataAvailable = Read_Data(&flashData[restDataCnt]);
-      flashByteCnt = restDataCnt + 1024;
     }
-    uartFlashCmdIsSet = false;
+    if (byteCnt < flashByteCnt) {
+      restDataCnt = flashByteCnt - byteCnt;
+      if (restDataCnt < sizeof(restData)+1) {
+        memmove(restData, &flashData[byteCnt], restDataCnt);
+      } else {
+        printf("Flash data parse error!\n");
+        return;
+      }
+    }
+    else {
+      restDataCnt = 0;
+    }
+    //printf("flashByteCnt %d, byteCnt %d, rest %d\n", flashByteCnt, byteCnt, restDataCnt);
+    HAL_Delay(100);
+    memset(flashData, 0x00, sizeof(flashData));
+    memmove(flashData, restData, restDataCnt);
+    index = 0;
+    byteCnt = 0;
+    dataAvailable = Read_Data(&flashData[restDataCnt]);
+    flashByteCnt = restDataCnt + 1024;
   }
 }
 
@@ -303,8 +298,9 @@ int main(void)
     if (sensorEnable) {
       AirSpeedSensorsFetchData();
       HAL_Delay(10);
-    } else {
-      UartFlashCmdPolling();
+    } else if (uartFlashReadCmd) {
+      UartFlashReadHanlder();
+      uartFlashReadCmd = false;
     }
     BSP_Button_Polling();
   }

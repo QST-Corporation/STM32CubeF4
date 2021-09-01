@@ -127,7 +127,7 @@ typedef struct
 //bool fls110Log = false;
 //bool ms4525Log = false;
 volatile bool sensorEnable = false;
-bool uartFlashCmdIsSet = false;
+bool uartFlashReadCmd = false;
 
 /******************************************************
  *                 Static Variables
@@ -190,7 +190,7 @@ void UartCmdParse(void)
     sensorEnable = true;
   } else if (memcmp(uart_cmd_str, flashReadCmd, sizeof(flashReadCmd)-1) == 0)
   {
-    uartFlashCmdIsSet = true;
+    uartFlashReadCmd = true;
   }
 
 }
@@ -256,7 +256,7 @@ void BSP_STDIO_Init(void)
   GPIO_InitTypeDef  GPIO_InitStruct;
 
   UartStdio.Instance          = USART_STDIO_UART;
-  UartStdio.Init.BaudRate     = 115200;
+  UartStdio.Init.BaudRate     = 921600;//115200;
   UartStdio.Init.WordLength   = UART_WORDLENGTH_8B;
   UartStdio.Init.StopBits     = UART_STOPBITS_1;
   UartStdio.Init.Parity       = UART_PARITY_NONE;
