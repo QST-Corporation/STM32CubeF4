@@ -436,35 +436,62 @@ void BSP_Button_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
 }
 
+/*
+ * @brief  Button behavior handler
+ *
+ * short press(less than 3s): enable/disable sensors sampling
+ *          LED2 behavior: Enable-LED On, Disable-LED Off
+ * long press(hold more than 3s): disable sensor sampling and erase flash stored sensor data
+ *          LED2 behavior: blinking with 200ms interval.
+ */
 void BSP_Button_Polling(void)
 {
-  GPIO_PinState buttonStatus;
-  bool buttonUnPressed = true;
-  uint32_t pressedFreshTime = 0;
+  volatile GPIO_PinState buttonStatus;
+  static bool shortPressed = false, longPressed = false;
+  static uint32_t pressedFreshTime = 0, ledFreshTime = 0;
 
   buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
 
   if(buttonStatus == GPIO_PIN_RESET)
   {
-    //printf("b1 puch.....\n");
     HAL_Delay(10);
-    if ((buttonUnPressed) && (buttonStatus == GPIO_PIN_RESET)) {
-      pressedFreshTime = HAL_GetTick();
-      buttonUnPressed = false;
-      if (sensorEnable) {
-        //sensorEnable = false;
-      } else {
-        sensorEnable = true;
+    buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+    if (buttonStatus == GPIO_PIN_RESET) {
+      if ((shortPressed == false) && (longPressed == false)) {
+        pressedFreshTime = HAL_GetTick();
+        printf("short pressed\n");
+        shortPressed = true;
+      }else if((HAL_GetTick() - pressedFreshTime) > 3000){
+        if (longPressed == false) {
+          printf("long Pressed\n");
+          longPressed = true;
+          sensorEnable = false;
+          shortPressed = false;
+        } else if ((HAL_GetTick() - ledFreshTime) > 200) {
+          ledFreshTime = HAL_GetTick();
+          BSP_LED_Toggle(LED2);
+        }
       }
-    }//else if((HAL_GetTick() - pressedFreshTime) > 2000){
-     //   printf("long Press\n");
-     //   sensorEnable = false;
-     //   Erase_data();
-    //}
+    }
   } else {
     HAL_Delay(10);
+    buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
     if(buttonStatus == GPIO_PIN_SET) {
-      buttonUnPressed = true;
+      if (shortPressed) {
+        shortPressed = false;
+        if (sensorEnable) {
+          sensorEnable = false;
+          BSP_LED_Off(LED2);
+        } else {
+          sensorEnable = true;
+          BSP_LED_On(LED2);
+        }
+      } else if (longPressed) {
+        longPressed = false;
+        BSP_LED_Off(LED2);
+        printf("Erase flash...\n");
+        Erase_data();
+      }
     }
   }
 }
