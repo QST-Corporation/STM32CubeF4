@@ -168,6 +168,7 @@ enum Qmi8658Register
 	Qmi8658Register_AccEl_Y,
 	Qmi8658Register_AccEl_Z,
 
+  Qmi8658Register_SW_Reset = 96,
 	Qmi8658Register_I2CM_STATUS = 110
 };
 
@@ -461,6 +462,7 @@ struct Qmi8658Config
  *             Function Declarations
  ******************************************************/
 void MX_I2C1_Init(void);
+void MX_SPI2_Init(void);
 void QMI8658_Sensor_Test(void);
 
 #ifdef __cplusplus

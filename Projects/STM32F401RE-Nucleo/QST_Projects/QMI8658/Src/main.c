@@ -167,14 +167,15 @@ int main(void)
   /* Log version info */
   PrintVersion();
 
-  /* Perform I2C initialization for QST QMI8658 sensor*/
+  /* Perform I2C&SPI initialization for QST QMI8658 sensor*/
   MX_I2C1_Init();
+  MX_SPI2_Init();
 
   /* Infinite loop */
   while (1)
   {
     QMI8658_Sensor_Test();
-    HAL_Delay(100);
+    HAL_Delay(10);
   }
 }
 

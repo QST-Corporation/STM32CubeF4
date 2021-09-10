@@ -37,12 +37,16 @@
  * @date    2021-09-03
  * @id      $Id$
  * @brief   This file provides the functions for QST QMI8658 sensor evaluation.
- *          |----------------------|
- *          |--F401RE---|--MS4525--|
- *          |----------------------|
- *          |---PB6-----|---SCL----|
- *          |---PB7-----|---SDA----|
- *          |---+5V-----|--Supply--|
+ *          |----I2C----|----------|---SPI-----|
+ *          |----------------------------------|
+ *          |--F401RE---|--QMI8658-|--F401RE---|
+ *          |----------------------------------|
+ *          |---PB6-----|--SCK_SCL-|---PB10----|
+ *          |---PB7-----|-MOSI_SDA-|---PC3-----|
+ *          |---+3.3V---|---nCS----|---PB12----|
+ *          |----NC-----|--SDO_SA0-|---PC2-----|
+ *          |---+3.3V---|---VDD----|---+3.3V---|
+ *          |---+3.3V---|--VDDIO---|---+3.3V---|
  * @note
  *
  *****************************************************************************/
@@ -65,16 +69,17 @@
 #define QMI8658_SLAVE_ADDR_READ       ((qmi8658_slave_addr<<1)|1)
 #define QMI8658_SLAVE_ADDR_WRITE      ((qmi8658_slave_addr<<1)|0)
 #define QMI8658_IIC_TIMEOUT           0x007F
+#define QMI8658_SPI_TIMEOUT           0x007F
 
 #define qmi8658_printf                printf
 #define QMI8658_UINT_MG_DPS
+#define QMI8658_USE_IIC               false//true: I2C, false: SPI
 //extern uint32_t system_ticks;
 enum
 {
 	AXIS_X = 0,
 	AXIS_Y = 1,
 	AXIS_Z = 2,
-
 	AXIS_TOTAL
 };
 
@@ -99,6 +104,9 @@ extern void Error_Handler(void);
  *                 Global Variables
  ******************************************************/
 I2C_HandleTypeDef hi2c1;
+SPI_HandleTypeDef hspi2;
+DMA_HandleTypeDef hdma_spi2_rx;
+DMA_HandleTypeDef hdma_spi2_tx;
 
 /******************************************************
  *                 Static Variables
@@ -121,6 +129,68 @@ void MX_I2C1_Init(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+  GPIO_InitTypeDef GPIO_InitStruct;
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+  MX_DMA_Init();
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;//SPI_NSS_HARD_OUTPUT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;//SPI_BAUDRATEPRESCALER_4;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;//GPIO_SPEED_FAST;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+  /* USER CODE END SPI2_Init 2 */
+
 }
 
 void HAL_I2C_MspInit(I2C_HandleTypeDef* i2cHandle)
@@ -172,6 +242,134 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
   }
 }
 
+/**
+* @brief SPI MSP Initialization
+* This function configures the hardware resources used in this example
+* @param hspi: SPI handle pointer
+* @retval None
+*/
+void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  if(hspi->Instance==SPI2)
+  {
+  /* USER CODE BEGIN SPI2_MspInit 0 */
+
+  /* USER CODE END SPI2_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_SPI2_CLK_ENABLE();
+
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    /**SPI2 GPIO Configuration
+    PC2     ------> SPI2_MISO
+    PC3     ------> SPI2_MOSI
+    PB10     ------> SPI2_SCK
+    PB12     ------> SPI2_NSS
+    */
+
+    /*GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;//GPIO_SPEED_FAST;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);*/
+
+    GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_10/*|GPIO_PIN_12*/;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    /* SPI2 DMA Init */
+    /* SPI2_RX Init */
+    hdma_spi2_rx.Instance = DMA1_Stream3;
+    hdma_spi2_rx.Init.Channel = DMA_CHANNEL_0;
+    hdma_spi2_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_spi2_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_spi2_rx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_spi2_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_spi2_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_spi2_rx.Init.Mode = DMA_NORMAL;
+    hdma_spi2_rx.Init.Priority = DMA_PRIORITY_HIGH;
+    hdma_spi2_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    if (HAL_DMA_Init(&hdma_spi2_rx) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(hspi,hdmarx,hdma_spi2_rx);
+
+    /* SPI2_TX Init */
+    hdma_spi2_tx.Instance = DMA1_Stream4;
+    hdma_spi2_tx.Init.Channel = DMA_CHANNEL_0;
+    hdma_spi2_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+    hdma_spi2_tx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_spi2_tx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_spi2_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_spi2_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_spi2_tx.Init.Mode = DMA_NORMAL;
+    hdma_spi2_tx.Init.Priority = DMA_PRIORITY_HIGH;
+    hdma_spi2_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    if (HAL_DMA_Init(&hdma_spi2_tx) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(hspi,hdmatx,hdma_spi2_tx);
+
+  /* USER CODE BEGIN SPI2_MspInit 1 */
+
+  /* USER CODE END SPI2_MspInit 1 */
+  }
+
+}
+
+/**
+* @brief SPI MSP De-Initialization
+* This function freeze the hardware resources used in this example
+* @param hspi: SPI handle pointer
+* @retval None
+*/
+void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
+{
+  if(hspi->Instance==SPI2)
+  {
+  /* USER CODE BEGIN SPI2_MspDeInit 0 */
+
+  /* USER CODE END SPI2_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_SPI2_CLK_DISABLE();
+
+    /**SPI2 GPIO Configuration
+    PC2     ------> SPI2_MISO
+    PC3     ------> SPI2_MOSI
+    PB10     ------> SPI2_SCK
+    PB12     ------> SPI2_NSS
+    */
+    HAL_GPIO_DeInit(GPIOC, GPIO_PIN_2|GPIO_PIN_3);
+
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_10|GPIO_PIN_12);
+
+    /* SPI2 DMA DeInit */
+    HAL_DMA_DeInit(hspi->hdmarx);
+    HAL_DMA_DeInit(hspi->hdmatx);
+  /* USER CODE BEGIN SPI2_MspDeInit 1 */
+
+  /* USER CODE END SPI2_MspDeInit 1 */
+  }
+
+}
+
+#if (QMI8658_USE_IIC)
 static HAL_StatusTypeDef QMI8658_I2C_Read(uint8_t reg, uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
@@ -184,18 +382,7 @@ static HAL_StatusTypeDef QMI8658_I2C_Read(uint8_t reg, uint8_t *pData, uint16_t 
   return Status;
 }
 
-HAL_StatusTypeDef QMI8658_I2C_Write(uint8_t reg, uint8_t Val)
-{
-  HAL_StatusTypeDef Status;
-  uint8_t payload[2] = {0,};
-
-  payload[0] = reg;
-  payload[1] = Val;
-  Status = HAL_I2C_Master_Transmit(&hi2c1, QMI8658_SLAVE_ADDR_WRITE, payload, 2, QMI8658_IIC_TIMEOUT);
-  return Status;
-}
-
-HAL_StatusTypeDef QMI8658_I2C_Write_Mult_Bytes(uint8_t reg, uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef QMI8658_I2C_Write(uint8_t reg, uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
   uint8_t payload[100] = {0,};
@@ -205,6 +392,70 @@ HAL_StatusTypeDef QMI8658_I2C_Write_Mult_Bytes(uint8_t reg, uint8_t *pData, uint
   Status = HAL_I2C_Master_Transmit(&hi2c1, QMI8658_SLAVE_ADDR_WRITE, payload, size+1, QMI8658_IIC_TIMEOUT);
   return Status;
 }
+#else
+
+static void delay_us(uint16_t us)
+{
+  uint16_t i;
+  uint16_t count = us*17;
+  for(i=0; i<count; i++) {}
+}
+
+static HAL_StatusTypeDef QMI8658_SPI_Read(uint8_t reg, uint8_t *pData, uint16_t size)
+{
+  HAL_StatusTypeDef Status;
+  uint8_t txData[50] = {0,};
+  uint8_t rxData[50] = {0,};
+
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+
+  txData[0] = reg|0x80; //bit[7] = 1 for SPI read
+  //memset(rxData, 0x00, sizeof(rxData));
+  Status = HAL_SPI_TransmitReceive_DMA(&hspi2, txData, rxData, size+1);
+  delay_us(50);
+  memmove(pData, &rxData[1], size);
+
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+  delay_us(10);
+  return Status;
+}
+
+static HAL_StatusTypeDef QMI8658_SPI_Write(uint8_t reg, uint8_t *pData, uint16_t size)
+{
+  HAL_StatusTypeDef Status;
+  uint8_t payload[100] = {0,};
+
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+
+  payload[0] = reg&0x7F; //bit[7] = 0 for SPI write
+  memmove(&payload[1], pData, size);
+  Status = HAL_SPI_Transmit_DMA(&hspi2, payload, size+1);
+
+  delay_us(10);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+  delay_us(10);
+  return Status;
+}
+#endif
+
+static void QMI8658_Read_Regs(uint8_t reg, uint8_t *pData, uint16_t size)
+{
+#if (QMI8658_USE_IIC)
+  QMI8658_I2C_Read(reg, pData, size);
+#else
+  QMI8658_SPI_Read(reg, pData, size);
+#endif
+}
+
+static void QMI8658_Write_Reg(uint8_t reg, uint8_t val)
+{
+#if (QMI8658_USE_IIC)
+  QMI8658_I2C_Write(reg, &val, 1);
+#else
+  QMI8658_SPI_Write(reg, &val, 1);
+#endif
+}
+
 
 #if 0
 static qst_imu_layout imu_map;
@@ -322,10 +573,10 @@ void Qmi8658_config_acc(enum Qmi8658_AccRange range, enum Qmi8658_AccOdr odr, en
 	else
 		ctl_dada = (unsigned char)range|(unsigned char)odr;
 		
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl2, ctl_dada);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl2, ctl_dada);
 // set LPF & HPF
 	qmi8658_printf("a1\n");
-	QMI8658_I2C_Read(Qmi8658Register_Ctrl5, &ctl_dada,1);
+	QMI8658_Read_Regs(Qmi8658Register_Ctrl5, &ctl_dada,1);
 	ctl_dada &= 0xf0;
 	if(lpfEnable == Qmi8658Lpf_Enable)
 	{
@@ -337,7 +588,7 @@ void Qmi8658_config_acc(enum Qmi8658_AccRange range, enum Qmi8658_AccOdr odr, en
 		ctl_dada &= ~0x01;
 	}
 	ctl_dada = 0x00;
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl5,ctl_dada);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl5,ctl_dada);
 	qmi8658_printf("a2\n");
 	//qmi8658_i2c_deinit(pi2c);
 // set LPF & HPF
@@ -388,11 +639,11 @@ void Qmi8658_config_gyro(enum Qmi8658_GyrRange range, enum Qmi8658_GyrOdr odr, e
 		ctl_dada = (unsigned char)range|(unsigned char)odr|0x80;
 	else
 		ctl_dada = (unsigned char)range | (unsigned char)odr;
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl3, ctl_dada);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl3, ctl_dada);
 
 // Conversion from degrees/s to rad/s if necessary
 // set LPF & HPF
-	QMI8658_I2C_Read(Qmi8658Register_Ctrl5, &ctl_dada,1);
+	QMI8658_Read_Regs(Qmi8658Register_Ctrl5, &ctl_dada,1);
 	ctl_dada &= 0x0f;
 	if(lpfEnable == Qmi8658Lpf_Enable)
 	{
@@ -404,7 +655,7 @@ void Qmi8658_config_gyro(enum Qmi8658_GyrRange range, enum Qmi8658_GyrOdr odr, e
 		ctl_dada &= ~0x10;
 	}
 	ctl_dada = 0x00;
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl5,ctl_dada);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl5,ctl_dada);
 
 	//qmi8658_i2c_deinit(pi2c);
 // set LPF & HPF
@@ -413,7 +664,7 @@ void Qmi8658_config_gyro(enum Qmi8658_GyrRange range, enum Qmi8658_GyrOdr odr, e
 void Qmi8658_config_mag(enum Qmi8658_MagDev device, enum Qmi8658_MagOdr odr)
 {
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl4, device|odr);	
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl4, device|odr);	
 	//qmi8658_i2c_deinit(pi2c);
 }
 
@@ -425,7 +676,7 @@ void Qmi8658_config_ae(enum Qmi8658_AeOdr odr)
 	Qmi8658_config_acc(qmi8658_config.accRange, qmi8658_config.accOdr, Qmi8658Lpf_Enable, Qmi8658St_Disable);
 	Qmi8658_config_gyro(qmi8658_config.gyrRange, qmi8658_config.gyrOdr, Qmi8658Lpf_Enable, Qmi8658St_Disable);
 	Qmi8658_config_mag(qmi8658_config.magDev, qmi8658_config.magOdr);
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl6, odr);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl6, odr);
 	
 	//qmi8658_i2c_deinit(pi2c);
 }
@@ -489,7 +740,7 @@ void Qmi8658_send_ctl9cmd(enum Qmi8658_Ctrl9Command cmd)    //cmd=0x0d
 	unsigned char	status1 = 0x00;
 	unsigned short count=0;
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl9, (unsigned char)cmd);	// write commond to ctrl9
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl9, (unsigned char)cmd);	// write commond to ctrl9
 #if defined(QMI8658_HANDSHAKE_NEW)
 	#if defined(QMI8658_HANDSHAKE_TO_STATUS)
 	unsigned char status_reg = Qmi8658Register_StatusInt;	
@@ -499,30 +750,30 @@ void Qmi8658_send_ctl9cmd(enum Qmi8658_Ctrl9Command cmd)    //cmd=0x0d
 	unsigned char cmd_done = 0x01;
 	#endif
 	//count = 0;
-	QMI8658_I2C_Read(status_reg, &status1, 1);
+	QMI8658_Read_Regs(status_reg, &status1, 1);
 	qmi8658_printf("status1=%d\n",status1);
 	while(((status1&cmd_done)!=cmd_done)&&(count++<200))		// read statusINT until bit7 is 1
 	{
 		HAL_Delay(1);
-		QMI8658_I2C_Read(status_reg, &status1, 1);
+		QMI8658_Read_Regs(status_reg, &status1, 1);
 		//qmi8658_printf("first %d status_reg: 0x%x\n", count,status1);
 	}
 	qmi8658_printf("Qmi8658_config_fifo ctrl9 done-1: %d\n", count);
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl9, Qmi8658_Ctrl9_Cmd_NOP);	// write commond  0x00 to ctrl9
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl9, Qmi8658_Ctrl9_Cmd_NOP);	// write commond  0x00 to ctrl9
 	count = 0;
-	QMI8658_I2C_Read(status_reg, &status1, 1);
+	QMI8658_Read_Regs(status_reg, &status1, 1);
 	while(((status1&cmd_done)==cmd_done)&&(count++<200))		// read statusINT until bit7 is 0
 	{
 		HAL_Delay(1);
 		qmi8658_printf("second %d status_reg: 0x%x\n", count,status1);
-		QMI8658_I2C_Read(status_reg, &status1, 1);
+		QMI8658_Read_Regs(status_reg, &status1, 1);
 	}
 	qmi8658_printf("ctrl9 done-2: %d\n", count);
 #else
 	while(((status1&QMI8658_STATUS1_CMD_DONE)==0)&&(count++<200))
 	{
 		HAL_Delay(2);
-		QMI8658_I2C_Read(Qmi8658Register_Status1, &status1, sizeof(status1));
+		QMI8658_Read_Regs(Qmi8658Register_Status1, &status1, sizeof(status1));
 	}
 	//qmi8658_printf("fifo rst done : %d\n", count);
 #endif
@@ -534,7 +785,7 @@ void Qmi8658_send_ctl9cmd(enum Qmi8658_Ctrl9Command cmd)    //cmd=0x0d
 void Qmi8658_config_fifo(unsigned char watermark,enum Qmi8658_FifoSize size,enum Qmi8658_FifoMode mode,enum Qmi8658_fifo_format format)
 {
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl7, 0x00);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl7, 0x00);
 	#if 1
 	HAL_Delay(1);
 	#else
@@ -543,16 +794,16 @@ void Qmi8658_config_fifo(unsigned char watermark,enum Qmi8658_FifoSize size,enum
 	qmi8658_config.fifo_format = format;		//QMI8658_FORMAT_12_BYTES;
 	qmi8658_config.fifo_ctrl = (unsigned char)size | (unsigned char)mode;
 
-	QMI8658_I2C_Write(Qmi8658Register_FifoCtrl, qmi8658_config.fifo_ctrl);
-	QMI8658_I2C_Write(Qmi8658Register_FifoWmkTh, (unsigned char)watermark);
+	QMI8658_Write_Reg(Qmi8658Register_FifoCtrl, qmi8658_config.fifo_ctrl);
+	QMI8658_Write_Reg(Qmi8658Register_FifoWmkTh, (unsigned char)watermark);
 	Qmi8658_send_ctl9cmd(Qmi8658_Ctrl9_Cmd_Rst_Fifo);
 
 	if(format == QMI8658_FORMAT_ACCEL_6_BYTES)
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl7, 0x01);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl7, 0x01);
 	else if(format == QMI8658_FORMAT_GYRO_6_BYTES)
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl7, 0x02);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl7, 0x02);
 	else if(format == QMI8658_FORMAT_12_BYTES)
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl7, 0x03);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl7, 0x03);
 	//qmi8658_i2c_deinit(pi2c);
 }
 
@@ -565,7 +816,7 @@ unsigned short Qmi8658_read_fifo(unsigned char* data)
 	//void* pi2c = qmi8658_i2c_init();
 	Qmi8658_send_ctl9cmd(Qmi8658_Ctrl9_Cmd_Req_Fifo);
 
-	QMI8658_I2C_Read(Qmi8658Register_FifoCount, fifo_status, 2);
+	QMI8658_Read_Regs(Qmi8658Register_FifoCount, fifo_status, 2);
 	fifo_bytes = (unsigned short)(((fifo_status[1]&0x03)<<8)|fifo_status[0]);
 	fifo_bytes *= 2;
 	if((qmi8658_config.fifo_format == QMI8658_FORMAT_ACCEL_6_BYTES)||(qmi8658_config.fifo_format == QMI8658_FORMAT_GYRO_6_BYTES))
@@ -584,13 +835,13 @@ unsigned short Qmi8658_read_fifo(unsigned char* data)
 		#if 0
 		for(i=1; i<fifo_level; i++)
 		{
-			QMI8658_I2C_Read(Qmi8658Register_FifoData, data+i*12, 12);
+			QMI8658_Read_Regs(Qmi8658Register_FifoData, data+i*12, 12);
 		}
 		#else
-		QMI8658_I2C_Read(Qmi8658Register_FifoData, data, fifo_bytes);
+		QMI8658_Read_Regs(Qmi8658Register_FifoData, data, fifo_bytes);
 		#endif
 	}	
-	QMI8658_I2C_Write(Qmi8658Register_FifoCtrl, qmi8658_config.fifo_ctrl);
+	QMI8658_Write_Reg(Qmi8658Register_FifoCtrl, qmi8658_config.fifo_ctrl);
 
 	//qmi8658_i2c_deinit(pi2c);
 	return fifo_level;
@@ -609,7 +860,7 @@ unsigned char Qmi8658_readStatusInt(void)
 {
 	unsigned char status_int;
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Read(Qmi8658Register_StatusInt, &status_int, 1);
+	QMI8658_Read_Regs(Qmi8658Register_StatusInt, &status_int, 1);
 	//printf("status[0x%x	0x%x]\n",status[0],status[1]);
 	//qmi8658_i2c_deinit(pi2c);
 	return status_int;
@@ -619,7 +870,7 @@ unsigned char Qmi8658_readStatus0(void)
 {
 	unsigned char status[2];
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Read(Qmi8658Register_Status0, status, 1);
+	QMI8658_Read_Regs(Qmi8658Register_Status0, status, 1);
 	//printf("status[0x%x	0x%x]\n",status[0],status[1]);
 	//qmi8658_i2c_deinit(pi2c);
 	return status[0];
@@ -632,7 +883,7 @@ unsigned char Qmi8658_readStatus1(void)
 {
 	unsigned char status;
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Read(Qmi8658Register_Status1, &status, 1);
+	QMI8658_Read_Regs(Qmi8658Register_Status1, &status, 1);
 	//qmi8658_i2c_deinit(pi2c);
 	return status;
 }
@@ -645,7 +896,7 @@ float Qmi8658_readTemp(void)
 
 	//void* pi2c = qmi8658_i2c_init();
 	
-	QMI8658_I2C_Read(Qmi8658Register_Tempearture_L, buf, 2);
+	QMI8658_Read_Regs(Qmi8658Register_Tempearture_L, buf, 2);
 	temp = ((short)buf[1]<<8)|buf[0];
 	temp_f = (float)temp/256.0f;
 	//qmi8658_i2c_deinit(pi2c);
@@ -659,7 +910,7 @@ void Qmi8658_read_acc_xyz(float acc_xyz[3])
 	int32_t  xyz[3];
 	//void* pi2c = qmi8658_i2c_init();
 	
-	QMI8658_I2C_Read(Qmi8658Register_Ax_L, buf_reg, 6); 	// 0x19, 25
+	QMI8658_Read_Regs(Qmi8658Register_Ax_L, buf_reg, 6); 	// 0x19, 25
 	raw_acc_xyz[0] = (short)((unsigned short)(buf_reg[1]<<8) |( buf_reg[0]));
 	raw_acc_xyz[1] = (short)((unsigned short)(buf_reg[3]<<8) |( buf_reg[2]));
 	raw_acc_xyz[2] = (short)((unsigned short)(buf_reg[5]<<8) |( buf_reg[4]));
@@ -684,7 +935,7 @@ void Qmi8658_read_gyro_xyz(float gyro_xyz[3])
 	int16_t 			raw_gyro_xyz[3];
 	//void* pi2c = qmi8658_i2c_init();
 	
-	QMI8658_I2C_Read(Qmi8658Register_Gx_L, buf_reg, 6);  	// 0x1f, 31
+	QMI8658_Read_Regs(Qmi8658Register_Gx_L, buf_reg, 6);  	// 0x1f, 31
 	raw_gyro_xyz[0] = (int16_t)((uint16_t)(buf_reg[1]<<8) |( buf_reg[0]));
 	raw_gyro_xyz[1] = (int16_t)((uint16_t)(buf_reg[3]<<8) |( buf_reg[2]));
 	raw_gyro_xyz[2] = (int16_t)((uint16_t)(buf_reg[5]<<8) |( buf_reg[4]));	
@@ -692,34 +943,39 @@ void Qmi8658_read_gyro_xyz(float gyro_xyz[3])
 	gyro_xyz[0] = (raw_gyro_xyz[0]*1.0f)/gyro_lsb_div;
 	gyro_xyz[1] = (raw_gyro_xyz[1]*1.0f)/gyro_lsb_div;
 	gyro_xyz[2] = (raw_gyro_xyz[2]*1.0f)/gyro_lsb_div;
-  printf("raw:%d, lsb:%d, gyro:%f\n",raw_gyro_xyz[0], gyro_lsb_div, gyro_xyz[0]);
 
 	//qmi8658_i2c_deinit(pi2c);
 }
 
 void Qmi8658_read_xyz(float acc[3], float gyro[3], unsigned int *tim_count)
 {
-	unsigned char	buf_reg[12];
+  uint8_t regRaw[20] = {0,};
+	unsigned char	buf_reg[12] = {0,};
 	short 			raw_acc_xyz[3];
 	short 			raw_gyro_xyz[3];
 //	float acc_t[3];
 //	float gyro_t[3];
 	//void* pi2c = qmi8658_i2c_init();
+
+  QMI8658_Read_Regs(Qmi8658Register_StatusInt, regRaw, 20);	
 	if(tim_count)
 	{
-		unsigned char	buf[3];
+		unsigned char	buf[3] = {0,};
 		unsigned int timestamp;
-		QMI8658_I2C_Read(Qmi8658Register_Timestamp_L, buf, 3);	// 0x18	24
+		//QMI8658_Read_Regs(Qmi8658Register_Timestamp_L, buf, 3);	// 0x18	24
+    memmove(buf, &regRaw[3], 3);
 		timestamp = (unsigned int)(((unsigned int)buf[2]<<16)|((unsigned int)buf[1]<<8)|buf[0]);
-		if(timestamp > imu_timestamp)
+		if(timestamp >= imu_timestamp)
 			imu_timestamp = timestamp;
 		else
 			imu_timestamp = (timestamp+0x1000000-imu_timestamp);
 
-		*tim_count = imu_timestamp;		
+		*tim_count = imu_timestamp;
 	}
 
-	QMI8658_I2C_Read(Qmi8658Register_Ax_L, buf_reg, 12); 	// 0x19, 25
+	//QMI8658_Read_Regs(Qmi8658Register_Ax_L, buf_reg, 12); 	// 0x19, 25
+  //QMI8658_Read_Regs(Qmi8658Register_Gx_L, &buf_reg[6], 6); 	// 0x19, 25
+  memmove(buf_reg, &regRaw[8], 12);
 	raw_acc_xyz[0] = (short)((unsigned short)(buf_reg[1]<<8) |( buf_reg[0]));
 	raw_acc_xyz[1] = (short)((unsigned short)(buf_reg[3]<<8) |( buf_reg[2]));
 	raw_acc_xyz[2] = (short)((unsigned short)(buf_reg[5]<<8) |( buf_reg[4]));
@@ -770,18 +1026,18 @@ void Qmi8658_read_xyz_raw(short raw_acc_xyz[3], short raw_gyro_xyz[3], unsigned 
 	{
 		unsigned char	buf[3];
 		unsigned int timestamp;
-		QMI8658_I2C_Read(Qmi8658Register_Timestamp_L, buf, 3);	// 0x18	24
+		QMI8658_Read_Regs(Qmi8658Register_Timestamp_L, buf, 3);	// 0x18	24
 		timestamp = (unsigned int)(((unsigned int)buf[2]<<16)|((unsigned int)buf[1]<<8)|buf[0]);
 		if(timestamp > imu_timestamp)
 			imu_timestamp = timestamp;
 		else
 			imu_timestamp = (timestamp+0x1000000-imu_timestamp);
 
-		*tim_count = imu_timestamp;	
+		*tim_count = imu_timestamp;
 	}
 	if(raw_acc_xyz && raw_gyro_xyz)
 	{
-		QMI8658_I2C_Read(Qmi8658Register_Ax_L, buf_reg, 12); 	// 0x19, 25
+		QMI8658_Read_Regs(Qmi8658Register_Ax_L, buf_reg, 12); 	// 0x19, 25
 		raw_acc_xyz[0] = (short)((unsigned short)(buf_reg[1]<<8) |( buf_reg[0]));
 		raw_acc_xyz[1] = (short)((unsigned short)(buf_reg[3]<<8) |( buf_reg[2]));
 		raw_acc_xyz[2] = (short)((unsigned short)(buf_reg[5]<<8) |( buf_reg[4]));
@@ -791,14 +1047,14 @@ void Qmi8658_read_xyz_raw(short raw_acc_xyz[3], short raw_gyro_xyz[3], unsigned 
 	}
 	else if(raw_acc_xyz)
 	{
-		QMI8658_I2C_Read(Qmi8658Register_Ax_L, buf_reg, 6); 	// 0x19, 25
+		QMI8658_Read_Regs(Qmi8658Register_Ax_L, buf_reg, 6); 	// 0x19, 25
 		raw_acc_xyz[0] = (short)((unsigned short)(buf_reg[1]<<8) |( buf_reg[0]));
 		raw_acc_xyz[1] = (short)((unsigned short)(buf_reg[3]<<8) |( buf_reg[2]));
 		raw_acc_xyz[2] = (short)((unsigned short)(buf_reg[5]<<8) |( buf_reg[4]));
 	}
 	else if(raw_gyro_xyz)
 	{
-		QMI8658_I2C_Read(Qmi8658Register_Gx_L, buf_reg, 6); 	// 0x19, 25
+		QMI8658_Read_Regs(Qmi8658Register_Gx_L, buf_reg, 6); 	// 0x19, 25
 		raw_gyro_xyz[0] = (short)((unsigned short)(buf_reg[1]<<8) |( buf_reg[0]));
 		raw_gyro_xyz[1] = (short)((unsigned short)(buf_reg[3]<<8) |( buf_reg[2]));
 		raw_gyro_xyz[2] = (short)((unsigned short)(buf_reg[5]<<8) |( buf_reg[4]));
@@ -814,7 +1070,7 @@ void Qmi8658_read_ae(float quat[4], float velocity[3])
 	short 			raw_q_xyz[4];
 	short 			raw_v_xyz[3];
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Read(Qmi8658Register_Q1_L, buf_reg, 14);
+	QMI8658_Read_Regs(Qmi8658Register_Q1_L, buf_reg, 14);
 	raw_q_xyz[0] = (short)((unsigned short)(buf_reg[1]<<8) |( buf_reg[0]));
 	raw_q_xyz[1] = (short)((unsigned short)(buf_reg[3]<<8) |( buf_reg[2]));
 	raw_q_xyz[2] = (short)((unsigned short)(buf_reg[5]<<8) |( buf_reg[4]));
@@ -842,20 +1098,20 @@ void Qmi8658_enableWakeOnMotion(enum Qmi8658_Interrupt int_set, enum Qmi8658_Wak
 	unsigned char status1 = 0;
 	int count = 0;
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl7, QMI8658_CTRL7_DISABLE_ALL);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl7, QMI8658_CTRL7_DISABLE_ALL);
 	Qmi8658_config_acc(Qmi8658AccRange_8g, Qmi8658AccOdr_LowPower_21Hz, Qmi8658Lpf_Disable, Qmi8658St_Disable);
 
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_L, cal1_1_reg);
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_H, cal1_2_reg);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_L, cal1_1_reg);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_H, cal1_2_reg);
 	// ctrl9 wom setting
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl9, Qmi8658_Ctrl9_Cmd_WoM_Setting);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl9, Qmi8658_Ctrl9_Cmd_WoM_Setting);
 	while(((status1&QMI8658_STATUS1_CMD_DONE)==0)&&(count++<200))
 	{
 		HAL_Delay(2);
-		QMI8658_I2C_Read(Qmi8658Register_Status1, &status1, sizeof(status1));
+		QMI8658_Read_Regs(Qmi8658Register_Status1, &status1, sizeof(status1));
 	}
 	// ctrl9 wom setting
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl7, QMI8658_CTRL7_ACC_ENABLE);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl7, QMI8658_CTRL7_ACC_ENABLE);
 	//qmi8658_i2c_deinit(pi2c);
 }
 
@@ -864,15 +1120,15 @@ void Qmi8658_disableWakeOnMotion(void)
 	unsigned char status1 = 0;
 	int count = 0;
 	//void* pi2c = qmi8658_i2c_init();
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl7, QMI8658_CTRL7_DISABLE_ALL);
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_L, 0);
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_H, 0);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl7, QMI8658_CTRL7_DISABLE_ALL);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_L, 0);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_H, 0);
 	
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl9, Qmi8658_Ctrl9_Cmd_WoM_Setting);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl9, Qmi8658_Ctrl9_Cmd_WoM_Setting);
 	while(((status1&QMI8658_STATUS1_CMD_DONE)==0)&&(count++<200))
 	{
 		HAL_Delay(2);
-		QMI8658_I2C_Read(Qmi8658Register_Status1, &status1, sizeof(status1));
+		QMI8658_Read_Regs(Qmi8658Register_Status1, &status1, sizeof(status1));
 	}
 	//qmi8658_i2c_deinit(pi2c);
 }
@@ -885,9 +1141,9 @@ void Qmi8658_enableSensors(unsigned char enableFlags)
 		enableFlags |= QMI8658_CTRL7_ACC_ENABLE | QMI8658_CTRL7_GYR_ENABLE;
 	}
 #if defined(QMI8658_SYNC_SAMPLE_MODE)
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl7, enableFlags | 0x80);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl7, enableFlags | 0x80);
 #else
-	QMI8658_I2C_Write(Qmi8658Register_Ctrl7, enableFlags & QMI8658_CTRL7_ENABLE_MASK);
+	QMI8658_Write_Reg(Qmi8658Register_Ctrl7, enableFlags & QMI8658_CTRL7_ENABLE_MASK);
 #endif
 
 	//qmi8658_i2c_deinit(pi2c);
@@ -947,26 +1203,26 @@ unsigned char stepConfig(unsigned short odr)  //11hz=0x0e��
 	ped_sig_count = 1;//�Ʋ�����1
 	
 
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_L, ped_sample_cnt & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_H, (ped_sample_cnt >> 8) & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal2_L, ped_fix_peak2peak & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal2_H, (ped_fix_peak2peak >> 8) & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal3_L, ped_fix_peak & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal3_H, (ped_fix_peak >> 8) & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal4_L, 0x01);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_L, ped_sample_cnt & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_H, (ped_sample_cnt >> 8) & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal2_L, ped_fix_peak2peak & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal2_H, (ped_fix_peak2peak >> 8) & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal3_L, ped_fix_peak & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal3_H, (ped_fix_peak >> 8) & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal4_L, 0x01);
 	qmi8658_printf("+");
 
 	
 	Qmi8658_send_ctl9cmd (Qmi8658_Ctrl9_Cmd_EnablePedometer);
 	qmi8658_printf(".");
 	///////////////////////////////
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_L,ped_time_up & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal1_H, (ped_time_up >> 8) & 0xFF);
-	QMI8658_I2C_Write(Qmi8658Register_Cal2_L,ped_time_low );
-	QMI8658_I2C_Write(Qmi8658Register_Cal2_H, ped_time_cnt_entry );
-	QMI8658_I2C_Write(Qmi8658Register_Cal3_L, ped_fix_precision );
-	QMI8658_I2C_Write(Qmi8658Register_Cal3_H, ped_sig_count );
-	QMI8658_I2C_Write(Qmi8658Register_Cal4_L, 0x02 );
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_L,ped_time_up & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal1_H, (ped_time_up >> 8) & 0xFF);
+	QMI8658_Write_Reg(Qmi8658Register_Cal2_L,ped_time_low );
+	QMI8658_Write_Reg(Qmi8658Register_Cal2_H, ped_time_cnt_entry );
+	QMI8658_Write_Reg(Qmi8658Register_Cal3_L, ped_fix_precision );
+	QMI8658_Write_Reg(Qmi8658Register_Cal3_H, ped_sig_count );
+	QMI8658_Write_Reg(Qmi8658Register_Cal4_L, 0x02 );
 	qmi8658_printf("-");
 	Qmi8658_send_ctl9cmd (Qmi8658_Ctrl9_Cmd_EnablePedometer);
 	qmi8658_printf("*");
@@ -983,10 +1239,11 @@ unsigned char Qmi8658_init(void)
 	unsigned char iCount = 0;
 	unsigned char Qmi8658Register_Ctrl8_value=0;
 	//void* pi2c = qmi8658_i2c_init();
+
 	while((qmi8658_chip_id == 0x00)&&(iCount<2))
 	{
 		qmi8658_slave_addr = qmi8658_slave[iCount];
-		QMI8658_I2C_Read(Qmi8658Register_WhoAmI, &qmi8658_chip_id, 1);
+		QMI8658_Read_Regs(Qmi8658Register_WhoAmI, &qmi8658_chip_id, 1);
 		//qmi8658_printf("Qmi8658 ChipID-1=0x%02x \n", qmi8658_chip_id);
 		if(qmi8658_chip_id == 0x05)
 			break;
@@ -997,20 +1254,20 @@ unsigned char Qmi8658_init(void)
 	{
 		unsigned char firmware_id[3];
 		
-		QMI8658_I2C_Read(Qmi8658Register_Ctrl1, &qmi8658_revision_id, 1);
+		QMI8658_Read_Regs(Qmi8658Register_Ctrl1, &qmi8658_revision_id, 1);
 		qmi8658_printf("Qmi8658Register_Ctr1-1=0x%02x \n", qmi8658_revision_id);
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl1, 0x60);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl1, 0x60);
 		
-		QMI8658_I2C_Read(Qmi8658Register_Ctrl1, &qmi8658_revision_id, 1);
+		QMI8658_Read_Regs(Qmi8658Register_Ctrl1, &qmi8658_revision_id, 1);
 		qmi8658_printf("Qmi8658Register_Ctr1-2=0x%02x \n", qmi8658_revision_id);
 
 		qmi8658_chip_id = 0;
-		QMI8658_I2C_Read(Qmi8658Register_WhoAmI, &qmi8658_chip_id, 1);
+		QMI8658_Read_Regs(Qmi8658Register_WhoAmI, &qmi8658_chip_id, 1);
 		qmi8658_printf("Qmi8658 ChipID=0x%02x \n", qmi8658_chip_id);
 		
-		QMI8658_I2C_Read(Qmi8658Register_Revision, &qmi8658_revision_id, 1);
+		QMI8658_Read_Regs(Qmi8658Register_Revision, &qmi8658_revision_id, 1);
 		qmi8658_printf("Qmi8658_init slave=0x%x  Qmi8658Register_WhoAmI=0x%x 0x%x\n", qmi8658_slave_addr,qmi8658_chip_id,qmi8658_revision_id);
-		QMI8658_I2C_Read(0x49, firmware_id, 3);
+		QMI8658_Read_Regs(0x49, firmware_id, 3);
 		qmi8658_printf("Old Firmware ID[0x%x 0x%x 0x%x]\n", firmware_id[0],firmware_id[1],firmware_id[2]);
 
 		qmi8658_config.inputSelection = QMI8658_CONFIG_ACCGYR_ENABLE;//QMI8658_CONFIG_ACC_ENABLE;//QMI8658_CONFIG_ACCGYR_ENABLE;
@@ -1025,8 +1282,8 @@ unsigned char Qmi8658_init(void)
 		qmi8658_config.magDev = MagDev_AKM09918;
 		qmi8658_config.aeOdr = Qmi8658AeOdr_128Hz;
 		
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl7, 0x00);		//
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl8, 0xD0);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl7, 0x00);		//
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl8, 0xD0);
 		
 		qmi8658_printf("1\n");
 		stepConfig(qmi8658_config.accOdr);
@@ -1039,22 +1296,25 @@ unsigned char Qmi8658_init(void)
 			unsigned char read_data = 0x00;
 				 //pi2c = qmi8658_i2c_init();
 				
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl1, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl1, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl1=0x%x \n", read_data);
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl2, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl2, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl2=0x%x \n", read_data);
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl3, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl3, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl3=0x%x \n", read_data);
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl4, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl4, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl4=0x%x \n", read_data);
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl5, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl5, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl5=0x%x \n", read_data);
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl6, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl6, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl6=0x%x \n", read_data);
-			QMI8658_I2C_Read(Qmi8658Register_Ctrl7, &read_data, 1);
+			QMI8658_Read_Regs(Qmi8658Register_Ctrl7, &read_data, 1);
 			qmi8658_printf("Qmi8658Register_Ctrl7=0x%x \n", read_data);
 				//qmi8658_i2c_deinit(pi2c);
 		}
+
+    //wait until the sensor data ready, eg timestamp.
+    HAL_Delay(100);
 //		Qmi8658_set_layout(2);
 		//qmi8658_i2c_deinit(pi2c);
 		return 1;
@@ -1076,7 +1336,7 @@ uint8_t Qmi8658_get_chipid(uint8_t * chip_id)
 	uint8_t  ret = 0;
 	//void* pi2c = qmi8658_i2c_init();	
 	
-	QMI8658_I2C_Read(Qmi8658Register_WhoAmI, chip_id, 1);	
+	QMI8658_Read_Regs(Qmi8658Register_WhoAmI, chip_id, 1);	
 	if((*chip_id >= 0x05) && (*chip_id <= 0x06))
 	{
 		ret = 1;
@@ -1094,14 +1354,14 @@ uint32_t  Qmi8658_step_read_stepcounter(uint32_t * step)
 	//void* pi2c = qmi8658_i2c_init();
 
 	#if 1
-	QMI8658_I2C_Read(Qmi8658Register_AccEl_X,reg_data,3);
+	QMI8658_Read_Regs(Qmi8658Register_AccEl_X,reg_data,3);
 	#else
-	QMI8658_I2C_Read(Qmi8658Register_AccEl_X,reg_data,1);
-	QMI8658_I2C_Read(Qmi8658Register_AccEl_Y,&reg_data[1],1);
-	QMI8658_I2C_Read(Qmi8658Register_AccEl_Z,&reg_data[2],1);
+	QMI8658_Read_Regs(Qmi8658Register_AccEl_X,reg_data,1);
+	QMI8658_Read_Regs(Qmi8658Register_AccEl_Y,&reg_data[1],1);
+	QMI8658_Read_Regs(Qmi8658Register_AccEl_Z,&reg_data[2],1);
 	#endif
-	//QMI8658_I2C_Read(47,&reg_47,1);
-	//QMI8658_I2C_Read(Qmi8658Register_AccEl_X,reg_data,3);
+	//QMI8658_Read_Regs(47,&reg_47,1);
+	//QMI8658_Read_Regs(Qmi8658Register_AccEl_X,reg_data,3);
 	
   rslt =reg_data[2]<< 16 |reg_data[1]<< 8 |reg_data[0];
 	*step = 	rslt;
@@ -1123,9 +1383,9 @@ uint8_t Qmi8658_standby(void)
 	else
 	{
 		//void* pi2c = qmi8658_i2c_init();	
-		//QMI8658_I2C_Write(Qmi8658Register_Ctrl1,  0x61);
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl8,  0xC0);
-		QMI8658_I2C_Write(Qmi8658Register_Ctrl7,  0x00);
+		//QMI8658_Write_Reg(Qmi8658Register_Ctrl1,  0x61);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl8,  0xC0);
+		QMI8658_Write_Reg(Qmi8658Register_Ctrl7,  0x00);
 		//qmi8658_i2c_deinit(pi2c);		
 		return 1;
 	}	
@@ -1137,11 +1397,11 @@ void Qmi8658_step_reset_stepcounter(void)
 	uint8_t reg13;
 	void* pi2c = qmi8658_i2c_init();
 	//WaitMs(1);
-	QMI8658_I2C_Read(0x13, &reg13, 1);
+	QMI8658_Read_Regs(0x13, &reg13, 1);
 	tEmp = 0x80;
-	QMI8658_I2C_Write(0x13, &tEmp, 1);		// clear step
+	QMI8658_Write_Reg(0x13, &tEmp, 1);		// clear step
 	tEmp = reg13;
-	QMI8658_I2C_Write(0x13, &tEmp, 1);		// 
+	QMI8658_Write_Reg(0x13, &tEmp, 1);		// 
 
 	qmi8658_i2c_deinit(pi2c);
 	
@@ -1156,6 +1416,7 @@ void QMI8658_Sensor_Test(void)
   float acc[3] = {0,};
   float gyro[3] = {0,};
   uint32_t timeStamp = 0;
+
   if(0 == qmistatus)
   {
     if(Qmi8658_init())
@@ -1172,8 +1433,10 @@ void QMI8658_Sensor_Test(void)
     //qmi8658_printf("step counter:\treset\r\n", tEmp);
 
     Qmi8658_read_xyz(acc, gyro, &timeStamp);
-    qmi8658_printf("[%d]ACC: %.2f, %.2f, %.2f\n    Gyro: %.2f, %.2f, %.2f\n",
+    qmi8658_printf("[%d]ACC: %.2f, %.2f, %.2f\r\n    Gyro: %.2f, %.2f, %.2f\r\n",
                     timeStamp,acc[0],acc[1],acc[2],gyro[0],gyro[1],gyro[2]);
+    //qmi8658_printf("%d,%d,%d,%d,%d,%d\r\n",
+    //              (int16_t)acc[0],(int16_t)acc[1],(int16_t)acc[2],(int16_t)gyro[0],(int16_t)gyro[1],(int16_t)gyro[2]);
 
     //Qmi8658_read_gyro_xyz(gyro);
     //qmi8658_printf("Gyro: %.2f, %.2f, %.2f\n",gyro[0],gyro[1],gyro[2]);
