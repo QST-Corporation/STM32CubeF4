@@ -97,6 +97,7 @@ static unsigned int imu_timestamp = 0;
 struct Qmi8658Config qmi8658_config;
 static unsigned char qmi8658_slave_addr = QMI8658_SLAVE_ADDR_H;
 
+int16_t qmi8658Data[200][6] = {0,};
 
 extern void Error_Handler(void);
 
@@ -947,7 +948,7 @@ void Qmi8658_read_gyro_xyz(float gyro_xyz[3])
 	//qmi8658_i2c_deinit(pi2c);
 }
 
-void Qmi8658_read_xyz(float acc[3], float gyro[3], unsigned int *tim_count)
+void Qmi8658_read_xyz(int16_t acc[3], int16_t gyro[3], unsigned int *tim_count)
 {
   uint8_t regRaw[20] = {0,};
 	unsigned char	buf_reg[12] = {0,};
@@ -986,14 +987,14 @@ void Qmi8658_read_xyz(float acc[3], float gyro[3], unsigned int *tim_count)
 
 #if defined(QMI8658_UINT_MG_DPS)
 	// mg
-	acc[AXIS_X] = (float)(raw_acc_xyz[AXIS_X]*1000.0f)/acc_lsb_div;
-	acc[AXIS_Y] = (float)(raw_acc_xyz[AXIS_Y]*1000.0f)/acc_lsb_div;
-	acc[AXIS_Z] = (float)(raw_acc_xyz[AXIS_Z]*1000.0f)/acc_lsb_div;
+	acc[AXIS_X] = (int16_t)((raw_acc_xyz[AXIS_X]*1000.0f)/acc_lsb_div);
+	acc[AXIS_Y] = (int16_t)((raw_acc_xyz[AXIS_Y]*1000.0f)/acc_lsb_div);
+	acc[AXIS_Z] = (int16_t)((raw_acc_xyz[AXIS_Z]*1000.0f)/acc_lsb_div);
 #else
 	// m/s2
-	acc[AXIS_X] = (float)(raw_acc_xyz[AXIS_X]*ONE_G)/acc_lsb_div;
-	acc[AXIS_Y] = (float)(raw_acc_xyz[AXIS_Y]*ONE_G)/acc_lsb_div;
-	acc[AXIS_Z] = (float)(raw_acc_xyz[AXIS_Z]*ONE_G)/acc_lsb_div;
+	acc[AXIS_X] = (int16_t)(raw_acc_xyz[AXIS_X]*ONE_G)/acc_lsb_div;
+	acc[AXIS_Y] = (int16_t)(raw_acc_xyz[AXIS_Y]*ONE_G)/acc_lsb_div;
+	acc[AXIS_Z] = (int16_t)(raw_acc_xyz[AXIS_Z]*ONE_G)/acc_lsb_div;
 #endif
 //	acc[AXIS_X] = imu_map.sign[AXIS_X]*acc_t[imu_map.map[AXIS_X]];
 //	acc[AXIS_Y] = imu_map.sign[AXIS_Y]*acc_t[imu_map.map[AXIS_Y]];
@@ -1001,14 +1002,14 @@ void Qmi8658_read_xyz(float acc[3], float gyro[3], unsigned int *tim_count)
 
 #if defined(QMI8658_UINT_MG_DPS)
 	// dps
-	gyro[0] = (float)(raw_gyro_xyz[0]*1.0f)/gyro_lsb_div;
-	gyro[1] = (float)(raw_gyro_xyz[1]*1.0f)/gyro_lsb_div;
-	gyro[2] = (float)(raw_gyro_xyz[2]*1.0f)/gyro_lsb_div;
+	gyro[0] = (int16_t)((raw_gyro_xyz[0]*1.0f)/gyro_lsb_div);
+	gyro[1] = (int16_t)((raw_gyro_xyz[1]*1.0f)/gyro_lsb_div);
+	gyro[2] = (int16_t)((raw_gyro_xyz[2]*1.0f)/gyro_lsb_div);
 #else
 	// rad/s
-	gyro[AXIS_X] = (float)(raw_gyro_xyz[AXIS_X]*0.01745f)/gyro_lsb_div;		// *pi/180
-	gyro[AXIS_Y] = (float)(raw_gyro_xyz[AXIS_Y]*0.01745f)/gyro_lsb_div;
-	gyro[AXIS_Z] = (float)(raw_gyro_xyz[AXIS_Z]*0.01745f)/gyro_lsb_div;
+	gyro[AXIS_X] = (int16_t)(raw_gyro_xyz[AXIS_X]*0.01745f)/gyro_lsb_div;		// *pi/180
+	gyro[AXIS_Y] = (int16_t)(raw_gyro_xyz[AXIS_Y]*0.01745f)/gyro_lsb_div;
+	gyro[AXIS_Z] = (int16_t)(raw_gyro_xyz[AXIS_Z]*0.01745f)/gyro_lsb_div;
 #endif	
 //	gyro[AXIS_X] = imu_map.sign[AXIS_X]*gyro_t[imu_map.map[AXIS_X]];
 //	gyro[AXIS_Y] = imu_map.sign[AXIS_Y]*gyro_t[imu_map.map[AXIS_Y]];
@@ -1413,8 +1414,13 @@ void QMI8658_Sensor_Test(void)
 {
   uint32_t tEmp;
   static uint8_t qmistatus = 0;
-  float acc[3] = {0,};
-  float gyro[3] = {0,};
+  static uint8_t sampleCnt = 0;
+  static uint8_t loopCnt = 0;
+  static bool printable = false;
+  int16_t acc[3] = {0,};
+  int16_t gyro[3] = {0,};
+  int16_t sample[6] = {0};
+  static int16_t sampleMoveUnit[20][6] = {0};
   uint32_t timeStamp = 0;
 
   if(0 == qmistatus)
@@ -1433,10 +1439,51 @@ void QMI8658_Sensor_Test(void)
     //qmi8658_printf("step counter:\treset\r\n", tEmp);
 
     Qmi8658_read_xyz(acc, gyro, &timeStamp);
-    qmi8658_printf("[%d]ACC: %.2f, %.2f, %.2f\r\n    Gyro: %.2f, %.2f, %.2f\r\n",
-                    timeStamp,acc[0],acc[1],acc[2],gyro[0],gyro[1],gyro[2]);
-    //qmi8658_printf("%d,%d,%d,%d,%d,%d\r\n",
-    //              (int16_t)acc[0],(int16_t)acc[1],(int16_t)acc[2],(int16_t)gyro[0],(int16_t)gyro[1],(int16_t)gyro[2]);
+    //qmi8658_printf("[%d]ACC: %d, %d, %d\r\n    Gyro: %d, %d, %d\r\n",
+    //                timeStamp,acc[0],acc[1],acc[2],gyro[0],gyro[1],gyro[2]);
+    memmove(sample, acc, sizeof(acc));
+    memmove(&sample[3], gyro, sizeof(gyro));
+    if (sampleCnt > 200-1) {
+      loopCnt++;
+      sampleCnt = 0;
+    } //else {
+      //sampleCnt++;
+    //}
+    if (loopCnt < 1) { //first 200 cnt loop
+      memmove(&qmi8658Data[sampleCnt][0], sample, sizeof(sample));
+      //qmi8658_printf("sampleCnt %d\r\n",sampleCnt);
+      if(sampleCnt == 200-1) {
+        printable = true;
+        //qmi8658_printf("print sampleCnt %d\r\n",sampleCnt);
+      }
+    } else {
+      memmove(&sampleMoveUnit[sampleCnt%20][0], sample, sizeof(sample));
+      //qmi8658_printf("Cnt %d, mv %d\r\n",sampleCnt, sampleCnt%20);
+      if (sampleCnt%20 == 19) {
+        /// every 20 samples(move window unit)
+        //if((sampleCnt > 0)/*||(loopCnt > 1)*/) {
+          // new 20 samples since 2nd 200-cnt loop
+          //qmi8658_printf("move and print sampleCnt %d\r\n",sampleCnt);
+          memmove(&qmi8658Data[0][0], &qmi8658Data[20][0], 180*sizeof(sample));
+          memmove(&qmi8658Data[180][0], &sampleMoveUnit[0][0], 20*sizeof(sample));
+        //}
+        //qmi8658_printf("print sampleCnt %d\r\n",sampleCnt);
+        printable = true;
+      }
+    }
+
+    if(printable){
+      printable = false;
+      // output data via UART
+      for(uint8_t i=0; i<200; i++) {
+        qmi8658_printf("%d,%d,%d,%d,%d,%d\r\n",
+                      qmi8658Data[i][0],qmi8658Data[i][1],qmi8658Data[i][2],qmi8658Data[i][3],qmi8658Data[i][4],qmi8658Data[i][5]);
+      }
+    }
+
+    sampleCnt++;
+    //qmi8658_printf("[%d]ACC: %.2f, %.2f, %.2f\r\n    Gyro: %.2f, %.2f, %.2f\r\n",
+    //                timeStamp,acc[0],acc[1],acc[2],gyro[0],gyro[1],gyro[2]);
 
     //Qmi8658_read_gyro_xyz(gyro);
     //qmi8658_printf("Gyro: %.2f, %.2f, %.2f\n",gyro[0],gyro[1],gyro[2]);
