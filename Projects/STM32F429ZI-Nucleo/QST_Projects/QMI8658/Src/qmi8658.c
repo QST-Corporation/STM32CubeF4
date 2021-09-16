@@ -58,6 +58,7 @@
 #include <stdio.h>
 #include "bsp_uart.h"
 #include "qmi8658.h"
+#include "model_stat_walk_run_gyroZ.h"
 
 /******************************************************
  *                      Macros
@@ -1500,26 +1501,37 @@ void QMI8658_Sensor_Test(void)
         qmi8658_printf("%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\r\n",
                       qmi8658Data[i][0],qmi8658Data[i][1],qmi8658Data[i][2],qmi8658Data[i][3],qmi8658Data[i][4],qmi8658Data[i][5]);
       }
-#else
-      for(uint8_t i=0; i<200; i++) {
+//#else
+      uint16_t i = 0;
+      for(i=0; i<200; i++) {
         qmi8658_printf("%.4f,", qmi8658Data[i][0]);
       }
-      for(uint8_t i=0; i<200; i++) {
+      for(i=0; i<200; i++) {
         qmi8658_printf("%.4f,", qmi8658Data[i][1]);
       }
-      for(uint8_t i=0; i<200; i++) {
+      for(i=0; i<200; i++) {
         qmi8658_printf("%.4f,", qmi8658Data[i][2]);
       }
-      for(uint8_t i=0; i<200; i++) {
+      for(i=0; i<200; i++) {
         qmi8658_printf("%.4f,", qmi8658Data[i][3]);
       }
-      for(uint8_t i=0; i<200; i++) {
+      for(i=0; i<200; i++) {
         qmi8658_printf("%.4f,", qmi8658Data[i][4]);
       }
-      for(uint8_t i=0; i<200; i++) {
+      for(i=0; i<200; i++) {
         qmi8658_printf("%.4f,", qmi8658Data[i][5]);
       }
       qmi8658_printf("\r\n");
+#else
+      uint16_t i = 0;
+      float output[3] = {0,};
+      float IMU8568_gyro_z[200] = {0,};
+      for(i=0; i<200; i++) {
+        IMU8568_gyro_z[i] = qmi8658Data[i][5];
+      }
+      score(IMU8568_gyro_z, output);
+      //output[a,b,c]: a: stat, b: walk, c: run
+      qmi8658_printf("output[%.2f, %.2f, %.2f]\r\n",output[0],output[1],output[2]);
 #endif
     }
 
