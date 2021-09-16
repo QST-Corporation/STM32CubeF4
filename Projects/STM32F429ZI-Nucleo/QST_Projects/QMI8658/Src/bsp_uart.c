@@ -174,7 +174,7 @@ static void Error_Handler(void)
   * - Word Length = 8 Bits
   * - Stop Bit = One Stop bit
   * - Parity = None
-  * - BaudRate = 115200 baud
+  * - BaudRate = 921600 baud
   * - Hardware flow control disabled (RTS and CTS signals) 
   **/
 void BSP_STDIO_Init(void)
@@ -182,7 +182,7 @@ void BSP_STDIO_Init(void)
   GPIO_InitTypeDef  GPIO_InitStruct;
 
   UartStdio.Instance          = USART_STDIO_UART;
-  UartStdio.Init.BaudRate     = 115200;
+  UartStdio.Init.BaudRate     = 921600;//115200;
   UartStdio.Init.WordLength   = UART_WORDLENGTH_8B;
   UartStdio.Init.StopBits     = UART_STOPBITS_1;
   UartStdio.Init.Parity       = UART_PARITY_NONE;
