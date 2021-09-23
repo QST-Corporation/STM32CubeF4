@@ -498,10 +498,10 @@
               <FileType>1</FileType>
               <FilePath>..\Src\version_print.c</FilePath>
             </File>
-			<File>
-              <FileName>model_stat_walk_run_gyroZ.c</FileName>
+            <File>
+              <FileName>model_stat_walk_run_2axis.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Src\model_stat_walk_run_gyroZ.c</FilePath>
+              <FilePath>..\Src\model_stat_walk_run_2axis.c</FilePath>
             </File>
           </Files>
         </Group>

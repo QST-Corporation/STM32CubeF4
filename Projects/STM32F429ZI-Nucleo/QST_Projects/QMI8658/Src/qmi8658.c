@@ -58,7 +58,7 @@
 #include <stdio.h>
 #include "bsp_uart.h"
 #include "qmi8658.h"
-#include "model_stat_walk_run_gyroZ.h"
+#include "model_stat_walk_run_2axis.h"
 
 /******************************************************
  *                      Macros
@@ -1525,13 +1525,27 @@ void QMI8658_Sensor_Test(void)
 #else
       uint16_t i = 0;
       float output[3] = {0,};
-      float IMU8568_gyro_z[200] = {0,};
+      float IMU8568_accY_gyroX[400] = {0,};
       for(i=0; i<200; i++) {
-        IMU8568_gyro_z[i] = qmi8658Data[i][5];
+        IMU8568_accY_gyroX[i] = qmi8658Data[i][1]; //Acc_Y
       }
-      score(IMU8568_gyro_z, output);
-      //output[a,b,c]: a: stat, b: walk, c: run
+      for(i=0; i<200; i++) {
+        IMU8568_accY_gyroX[200+i] = qmi8658Data[i][3]; //Gyro_X
+      }
+
+#if 1
+      //*****************************************************************************//
+      //** make sure change the "double" type to "float" before invoke the score() **//
+      //*****************************************************************************//
+      score(IMU8568_accY_gyroX, output);
+      //format: output[a,b,c]: a: stat, b: walk, c: run
       qmi8658_printf("output[%.2f, %.2f, %.2f]\r\n",output[0],output[1],output[2]);
+#else
+      for(i=0;i<400;i++) {
+        qmi8658_printf("%.2f,", IMU8568_accY_gyroX[i]);
+      }
+      qmi8658_printf("\r\n");
+#endif
 #endif
     }
 
