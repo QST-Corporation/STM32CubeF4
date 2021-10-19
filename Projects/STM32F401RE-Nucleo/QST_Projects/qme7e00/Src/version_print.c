@@ -28,58 +28,97 @@
   OF SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
   (INCLUDING BUT NOT LIMITED TO ANY DEFENSE THEREOF), OR OTHER SIMILAR COSTS.
   
-*******************************************************************************/
+**************************************************************************************************/
 
 /******************************************************************************
- * @file    fls110.h
+ * @file    version_print.c
  * @author  QST AE team
  * @version V0.1
- * @date    2021-04-13
+ * @date    2021-01-22
  * @id      $Id$
- * @brief   This file provides the functions for FLS110 sensor evaluation.
+ * @brief   This file provides the functions for version info log.
  *
  * @note
  *
  *****************************************************************************/
 
-#ifndef _FLS110_H_
-#define _FLS110_H_
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
-
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <stdio.h>
 /******************************************************
  *                      Macros
  ******************************************************/
+#define VER(R)                        #R
+#define VERMACRO(R)                   VER(R)
 
-/******************************************************
- *                    Constants
- ******************************************************/
+/* Private function prototypes -----------------------------------------------*/
 
-/******************************************************
- *                   Enumerations
- ******************************************************/
- 
-/******************************************************
- *                    Structures
- ******************************************************/
 
 /******************************************************
  *                 Global Variables
  ******************************************************/
 
 /******************************************************
- *             Function Declarations
+ *                 Static Variables
  ******************************************************/
-void FLS_I2C1_Init(void);
-void FLS110_Sensor_Init(void);
-void FLS110_Sensor_Start(void);
-void FLS110_Sensor_Test(void);
+static char app_ver_str[50] = {"0.0.03"};
+const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug",
+                        "Sep", "Oct", "Nov", "Dec"};
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
+static void getdate(char* pDest, uint8_t size)
+{
+  char temp[] = __DATE__;
+  uint8_t i;
+  uint8_t month = 0, day, year;
 
-#endif /* _FLS110_H_ */
+  if((pDest == NULL) || (size < 18)) {
+    return;
+  }
+
+  year = atoi(temp + 9);
+  *(temp + 6) = 0;
+  day = atoi(temp + 4);
+  *(temp + 3) = 0;
+  for (i = 0; i < 12; i++)
+  {
+    if (!strcmp(temp, months[i]))
+    {
+      month = i + 1;
+      break;
+    }
+  }
+  *pDest++ = (year%100)/10+0x30;
+  *pDest++ = year%10+0x30;
+  *pDest++ = '-';
+  *pDest++ = (month%100)/10+0x30;
+  *pDest++ = month%10+0x30;
+  *pDest++ = '-';
+  *pDest++ = (day%100)/10+0x30;
+  *pDest++ = day%10+0x30;
+  *pDest++ = ' ';
+  memcpy(pDest,__TIME__,strlen(__TIME__));
+}
+
+static char* get_app_ver(void)
+{
+  //sprintf(app_ver_str, "%s", VERMACRO(APP_BUILD_VER));
+  return app_ver_str;
+}
+
+void PrintVersion(void)
+{
+  char time[20];
+  memset(time, 0, sizeof(time));
+  getdate(time, sizeof(time));
+
+  printf( "\r\n" );
+  printf( "=========================================================\r\n" );
+  printf( "            QST Corporation Ltd.\r\n" );
+  printf( "            QME7E00 Sensor Test\r\n" );
+  printf( "             (Version %s)\r\n", get_app_ver());
+  printf( "         [Build Time: 20%s]\r\n", time);
+  //printf( "               --By %s\r\n", AUTHOR);
+  printf( "=========================================================\r\n" );
+}

@@ -31,18 +31,18 @@
 **************************************************************************************************/
 
 /******************************************************************************
- * @file    fls110.c
+ * @file    qme7e00.c
  * @author  QST AE team
  * @version V0.1
  * @date    2021-04-13
  * @id      $Id$
- * @brief   This file provides the functions for FLS110 sensor evaluation.
- *          |----------------------|
- *          |--F401RE---|--FLS110--|
- *          |----------------------|
- *          |---PB6-----|---SCL----|
- *          |---PB7-----|---SDA----|
- *          |---+3.3V---|---VDD----|
+ * @brief   This file provides the functions for qme7e00 sensor evaluation.
+ *          |-----------------------|
+ *          |--F401RE---|--qme7e00--|
+ *          |-----------------------|
+ *          |---PB6-----|----SCL----|
+ *          |---PB7-----|----SDA----|
+ *          |---+3.3V---|----VDD----|
  * @note
  *
  *****************************************************************************/
@@ -53,7 +53,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "bsp_uart.h"
-#include "fls110.h"
+#include "qme7e00.h"
 
 /******************************************************
  *                      Macros
@@ -62,50 +62,50 @@
 #define I2C_SLAVE_ADDR                0x31
 #define I2C_SLAVE_ADDR_READ           ((I2C_SLAVE_ADDR<<1)|1)
 #define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)
-#define FLS110_TIMEOUT_MS             0x0A //I2C operation timout in ms
-#define FLS110_MAX_PAYLOAD            0x0C //12U
-#define FLS110_REG_FW_ID              0x10
-#define FLS110_REG_UNIQUE_ID          0x11
-#define FLS110_REG_FW_BUILD           0x12
-#define FLS110_REG_FW_RELEASE         0x13
-#define FLS110_REG_AVG_WINDOW         0x20
-#define FLS110_REG_MODE               0x21
-#define FLS110_REG_READY              0x2F
-#define FLS110_REG_READING            0x40
-#define FLS110_REG_SENSOR_H           0x41
-#define FLS110_REG_SENSOR_PWR         0x42
-#define FLS110_REG_FLOW_TEMP          0x43
-#define FLS110_REG_P_FLOW             0xE0
-#define FLS110_REG_RH_FLOW            0xE1
-#define FLS110_REG_CAL_TEMP           0xFC
-#define FLS110_REG_CAL0               0xF0
-#define FLS110_REG_CAL1               0xF1
-#define FLS110_REG_CAL2               0xF2
-#define FLS110_REG_CAL3               0xF3
-#define FLS110_REG_CALIBRATE          0xFF
-#define FLS110_REG_C1                 0xC1
-#define FLS110_REG_C2                 0xC2
-#define FLS110_REG_C3                 0xC3
-#define FLS110_REG_BASIS              0xCB
-#define FLS110_FW_ID                  0x0F100A
+#define QME7E00_TIMEOUT               0xFF //I2C operation timout in ms
+#define QME7E00_MAX_PAYLOAD           0x0C //12U
+#define QME7E00_REG_FW_ID             0x10
+#define QME7E00_REG_UNIQUE_ID         0x11
+#define QME7E00_REG_FW_BUILD          0x12
+#define QME7E00_REG_FW_RELEASE        0x13
+#define QME7E00_REG_AVG_WINDOW        0x20
+#define QME7E00_REG_MODE              0x21
+#define QME7E00_REG_READY             0x2F
+#define QME7E00_REG_READING           0x40
+#define QME7E00_REG_SENSOR_H          0x41
+#define QME7E00_REG_SENSOR_PWR        0x42
+#define QME7E00_REG_FLOW_TEMP         0x43
+#define QME7E00_REG_P_FLOW            0xE0
+#define QME7E00_REG_RH_FLOW           0xE1
+#define QME7E00_REG_CAL_TEMP          0xFC
+#define QME7E00_REG_CAL0              0xF0
+#define QME7E00_REG_CAL1              0xF1
+#define QME7E00_REG_CAL2              0xF2
+#define QME7E00_REG_CAL3              0xF3
+#define QME7E00_REG_CALIBRATE         0xFF
+#define QME7E00_REG_C1                0xC1
+#define QME7E00_REG_C2                0xC2
+#define QME7E00_REG_C3                0xC3
+#define QME7E00_REG_BASIS             0xCB
+#define QME7E00_FW_ID                 0x0F100A
 
 typedef enum {
-  FLS_MODE_IDLE,
-  FLS_MODE_CONTINUOUS,
-  FLS_MODE_SINGLESHOT,
-  FLS_MODE_ILLEGAL = 0xFFU
-}fls_mode_t;
+  QME_MODE_IDLE,
+  QME_MODE_CONTINUOUS,
+  QME_MODE_SINGLESHOT,
+  QME_MODE_ILLEGAL = 0xFFU
+}qme_mode_t;
 
 typedef enum {
-  FLS_SUCCESS    = 0x00U,
-  FLS_ERROR      = 0x01U
-}fls_status_t;
+  QME_SUCCESS    = 0x00U,
+  QME_ERROR      = 0x01U
+}qme_status_t;
 
 typedef enum {
-  FLS_NOTREADY   = 0x00U,
-  FLS_READY      = 0x01U,
-  FLS_READY_ILLEGAL = 0xFFU
-}fls_ready_t;
+  QME_NOTREADY   = 0x00U,
+  QME_READY      = 0x01U,
+  QME_READY_ILLEGAL = 0xFFU
+}qme_ready_t;
 
 extern void Error_Handler(void);
 
@@ -120,7 +120,7 @@ I2C_HandleTypeDef hi2c1;
 
 /* Private function prototypes -----------------------------------------------*/
 /* I2C1 init function */
-void FLS_I2C1_Init(void)
+void QME_I2C1_Init(void)
 {
   hi2c1.Instance = I2C1;
   hi2c1.Init.ClockSpeed = 100000;
@@ -186,44 +186,44 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
   }
 }
 
-static HAL_StatusTypeDef FLS_I2C_Read(uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef QME_I2C_Read(uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
-  //Status = HAL_I2C_Mem_Read_2(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, FLS110_TIMEOUT_MS);
-  Status = HAL_I2C_Master_Receive(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, FLS110_TIMEOUT_MS);
+  //Status = HAL_I2C_Mem_Read_2(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, QME7E00_TIMEOUT);
+  Status = HAL_I2C_Master_Receive(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, QME7E00_TIMEOUT);
   return Status;
 }
 
-static HAL_StatusTypeDef FLS_I2C_Write(uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef QME_I2C_Write(uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
 
-  Status = HAL_I2C_Master_Transmit(&hi2c1, I2C_SLAVE_ADDR_WRITE, pData, size, FLS110_TIMEOUT_MS);
+  Status = HAL_I2C_Master_Transmit(&hi2c1, I2C_SLAVE_ADDR_WRITE, pData, size, QME7E00_TIMEOUT);
   return Status;
 }
 
-static HAL_StatusTypeDef FLS110_Reg_Read(uint8_t reg, uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef QME7E00_Reg_Read(uint8_t reg, uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
 
-  Status = FLS_I2C_Write(&reg, 1);
+  Status = QME_I2C_Write(&reg, 1);
   if (Status != HAL_OK) {
     return Status;
   }
 
-  return FLS_I2C_Read(pData, size);
+  return QME_I2C_Read(pData, size);
 }
 
-static HAL_StatusTypeDef FLS110_Reg_Write(uint8_t reg, uint8_t *pData, uint16_t size)
+static HAL_StatusTypeDef QME7E00_Reg_Write(uint8_t reg, uint8_t *pData, uint16_t size)
 {
-  uint8_t payload[FLS110_MAX_PAYLOAD] = {0,};
+  uint8_t payload[QME7E00_MAX_PAYLOAD] = {0,};
 
   payload[0] = reg;
   memmove(&payload[1], pData, size);
-  return FLS_I2C_Write(payload, size+1);
+  return QME_I2C_Write(payload, size+1);
 }
 
-static fls_status_t FLS110_pflow_read(float *pdata)
+static qme_status_t QME7E00_pflow_read(float *pdata)
 {
   HAL_StatusTypeDef ret;
   uint8_t	regVal[4]={0};
@@ -232,158 +232,153 @@ static fls_status_t FLS110_pflow_read(float *pdata)
 
   if(pdata == NULL)
   {
-    return FLS_ERROR;
+    return QME_ERROR;
   }
-  ret = FLS110_Reg_Read(FLS110_REG_P_FLOW, regVal, 4);
+  ret = QME7E00_Reg_Read(QME7E00_REG_P_FLOW, regVal, 4);
   memmove((uint8_t *)&regPflow, regVal, sizeof(regVal));
   pflow = (float)regPflow/256;
 
-  printf("FLS110 Pflow(%d), %d, %.4fPa\n", ret, regPflow, pflow);
+  printf("QME7E00 Pflow(%d), %d, %.4fPa\n", ret, regPflow, pflow);
   *pdata = pflow;
 
-  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
+  return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
-static fls_status_t FLS110_data_read(float *pdata, float *pTemp)
+static qme_status_t QME7E00_data_read(float *pdata)
 {
   HAL_StatusTypeDef ret;
   uint8_t	regVal[4]={0}, regTemp[2]={0};
   uint32_t reading = 0;
   float flowTemp = 0.0f;
+  float dp_raw = 0.0f;
   float pressure = 0.0f;
 
   if(pdata == NULL)
   {
-    return FLS_ERROR;
+    return QME_ERROR;
   }
-  ret = FLS110_Reg_Read(FLS110_REG_READING, regVal, 4);
+  ret = QME7E00_Reg_Read(QME7E00_REG_READING, regVal, 4);
   memmove((uint8_t *)&reading, regVal, sizeof(regVal));
-  pressure = (float)reading/256;
-  FLS110_Reg_Read(FLS110_REG_FLOW_TEMP, regTemp, sizeof(regTemp));
+  dp_raw = (float)reading/256;
+  QME7E00_Reg_Read(QME7E00_REG_FLOW_TEMP, regTemp, sizeof(regTemp));
   flowTemp = (float)((int16_t)regTemp[1] << 8 | regTemp[0])/256;
 
-  printf("FLS110(%d), %d, %.1f, %.1f\n", ret, reading, pressure, flowTemp);
+  pressure = 4e-6f*dp_raw*dp_raw + 0.0661f*dp_raw;
+  printf("QME7E00(%d), %d, %.4f, %.1f\n", ret, reading, pressure, flowTemp);
   *pdata = pressure;
-  *pTemp = flowTemp;
 
-  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
+  return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
-static fls_status_t FLS110_Check_FW_ID(void)
+static qme_status_t QME7E00_Check_FW_ID(void)
 {
   //uint32_t readoutFwId = 0;
   uint8_t regVal[4] = {0,};
   uint32_t fw_id = 0;
   HAL_StatusTypeDef ret;
 
-  // wait for slave ready
-  while ((fw_id != FLS110_FW_ID) && (fw_id != (FLS110_FW_ID-1))) {
-    ret = FLS110_Reg_Read(FLS110_REG_FW_ID, regVal, sizeof(regVal));
-    fw_id = (uint32_t)regVal[3]<<24 | (uint32_t)regVal[2]<<16 | (uint32_t)regVal[1]<<8 | (uint32_t)regVal[0];
-    printf("FW_ID: 0x%04X\n", fw_id);
-    HAL_Delay(10);
-  }
-  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
+  ret = QME7E00_Reg_Read(QME7E00_REG_FW_ID, regVal, sizeof(regVal));
+  printf("FW_ID: %02X,%02X,%02X,%02X\n", regVal[0],regVal[1],regVal[2],regVal[3]);
+  //readoutFwId = regVal[0]
+  return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
-static fls_status_t FLS110_Check_Unique_ID(void)
+static qme_status_t QME7E00_Check_Unique_ID(void)
 {
   uint8_t regVal[12] = {0,};
   HAL_StatusTypeDef ret;
 
-  ret = FLS110_Reg_Read(FLS110_REG_UNIQUE_ID, regVal, sizeof(regVal));
+  ret = QME7E00_Reg_Read(QME7E00_REG_UNIQUE_ID, regVal, sizeof(regVal));
   printf("Processor ID: ");
   for(uint8_t i=0; i<sizeof(regVal); i++) {
     printf("%02X,", regVal[i]);
   }
   printf("\n");
-  return ret == HAL_OK ? FLS_SUCCESS : FLS_ERROR;
+  return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
-static fls_status_t FLS110_Set_Mode(fls_mode_t mode)
+static qme_status_t QME7E00_Set_Mode(qme_mode_t mode)
 {
   HAL_StatusTypeDef ret;
-  fls_mode_t readout_mode = FLS_MODE_ILLEGAL;
-  ret = FLS110_Reg_Write(FLS110_REG_MODE, &mode, 1);
-  //printf("Set FLS110 mode %d status:%d\n", mode, ret);
+  qme_mode_t readout_mode = QME_MODE_ILLEGAL;
+  ret = QME7E00_Reg_Write(QME7E00_REG_MODE, &mode, 1);
+  //printf("Set QME7E00 mode %d status:%d\n", mode, ret);
   if (ret != HAL_OK){
-    printf("Set FLS110 mode %d failed\n", mode);
-    return FLS_ERROR;
+    printf("Set QME7E00 mode %d failed\n", mode);
+    return QME_ERROR;
   }
 
   HAL_Delay(10);
-  ret = FLS110_Reg_Read(FLS110_REG_MODE, &readout_mode, 1);
-  //printf("Readout FLS110 mode %d status: %d\n", readout_mode, ret);
+  ret = QME7E00_Reg_Read(QME7E00_REG_MODE, &readout_mode, 1);
+  //printf("Readout QME7E00 mode %d status: %d\n", readout_mode, ret);
   if((ret != HAL_OK) || (readout_mode != mode))
   {
-    printf("Verify FLS110 mode %d failed, readout: %d\n", mode, readout_mode);
-    return FLS_ERROR;
+    printf("Verify QME7E00 mode %d failed, readout: %d\n", mode, readout_mode);
+    return QME_ERROR;
   }
-  printf("Set FLS110 mode %d success\n", mode);
-  return FLS_SUCCESS;
+  printf("Set QME7E00 mode %d success\n", mode);
+  return QME_SUCCESS;
 }
 
-static fls_status_t FLS110_Set_Avg(uint8_t avg)
+static qme_status_t QME7E00_Set_Avg(uint8_t avg)
 {
   HAL_StatusTypeDef ret;
   uint8_t readout_avg = 0xFF;
-  ret = FLS110_Reg_Write(FLS110_REG_AVG_WINDOW, &avg, 1);
-  //printf("Set FLS110 Avg %d status:%d\n", avg, ret);
+  ret = QME7E00_Reg_Write(QME7E00_REG_AVG_WINDOW, &avg, 1);
+  //printf("Set QME7E00 Avg %d status:%d\n", avg, ret);
   if (ret != HAL_OK){
-    printf("Set FLS110 Avg %d failed\n", avg);
-    return FLS_ERROR;
+    printf("Set QME7E00 Avg %d failed\n", avg);
+    return QME_ERROR;
   }
 
   HAL_Delay(10);
-  ret = FLS110_Reg_Read(FLS110_REG_AVG_WINDOW, &readout_avg, 1);
-  //printf("Readout FLS110 Avg %d status: %d\n", readout_avg, ret);
+  ret = QME7E00_Reg_Read(QME7E00_REG_AVG_WINDOW, &readout_avg, 1);
+  //printf("Readout QME7E00 Avg %d status: %d\n", readout_avg, ret);
   if((ret != HAL_OK) || (readout_avg != avg))
   {
-    printf("Verify FLS110 Avg %d failed, readout: %d\n", avg, readout_avg);
-    return FLS_ERROR;
+    printf("Verify QME7E00 Avg %d failed, readout: %d\n", avg, readout_avg);
+    return QME_ERROR;
   }
-  printf("Set FLS110 Avg %d success\n", avg);
-  return FLS_SUCCESS;
+  printf("Set QME7E00 Avg %d success\n", avg);
+  return QME_SUCCESS;
 }
 
-static fls_ready_t FLS110_Get_Ready(void)
+static qme_ready_t QME7E00_Get_Ready(void)
 {
-  fls_ready_t regReady = FLS_READY_ILLEGAL;
+  qme_ready_t regReady = QME_READY_ILLEGAL;
   HAL_StatusTypeDef ret;
 
-  ret = FLS110_Reg_Read(FLS110_REG_READY, &regReady, 1);
+  ret = QME7E00_Reg_Read(QME7E00_REG_READY, &regReady, 1);
   UNUSED(ret);//printf("Reg READY(%02X): %02X\n", ret, regReady);
   return regReady;
 }
 
-void FLS110_Sensor_Start(void)
+void QME7E00_Sensor_Start(void)
 {
-  FLS110_Set_Mode(FLS_MODE_CONTINUOUS);
+  QME7E00_Set_Mode(QME_MODE_CONTINUOUS);
 }
 
-void FLS110_Sensor_Stop(void)
+void QME7E00_Sensor_Stop(void)
 {
-  FLS110_Set_Mode(FLS_MODE_IDLE);
+  QME7E00_Set_Mode(QME_MODE_IDLE);
 }
 
-void FLS110_Sensor_Init(void)
+void QME7E00_Sensor_Init(void)
 {
-  FLS110_Check_FW_ID();
-  FLS110_Sensor_Stop(); //stop sensor first if it is running.
-  FLS110_Check_Unique_ID();
-  FLS110_Set_Avg(8);
-  FLS110_Sensor_Start();
+  QME7E00_Check_FW_ID();
+  QME7E00_Check_Unique_ID();
+  QME7E00_Set_Avg(8);
+  QME7E00_Sensor_Start();
 }
 
-void FLS110_Sensor_Test(void)
+void QME7E00_Sensor_Test(void)
 {
-  float dp = 0.0f;
-  float temperature = 0.0f;
+  float diff_pressure = 0;
   //float pflow = 0.0f;
 
-  while(FLS110_Get_Ready() != FLS_READY){
+  while(QME7E00_Get_Ready() != QME_READY){
     //HAL_Delay(1);
   }
-  FLS110_data_read(&dp, &temperature);
-  //FLS110_pflow_read(&pflow);
+  QME7E00_data_read(&diff_pressure);
+  //QME7E00_pflow_read(&pflow);
 }

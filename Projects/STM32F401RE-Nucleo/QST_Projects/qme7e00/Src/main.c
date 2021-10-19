@@ -31,12 +31,12 @@
 **************************************************************************************************/
 
 /******************************************************************************
- * @file    flusso_fls110/Src/main.c
+ * @file    qme7e00/Src/main.c
  * @author  QST AE team
  * @version V0.1
  * @date    2021-04-13
  * @id      $Id$
- * @brief   This code used to test Flusso FLS110 sensor and output the data via debug UART.
+ * @brief   This code used to test QST QME7E00 sensor and output the data via debug UART.
  *
  * @note
  *
@@ -46,7 +46,7 @@
 #include "main.h"
 #include "bsp_uart.h"
 #include "version_print.h"
-#include "fls110.h"
+#include "qme7e00.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -167,14 +167,14 @@ int main(void)
   /* Log version info */
   PrintVersion();
 
-  /* Perform I2C initialization for FLS110 sensor*/
-  FLS_I2C1_Init();
-  FLS110_Sensor_Init();
+  /* Perform I2C initialization for QME7E00 sensor*/
+  QME_I2C1_Init();
+  QME7E00_Sensor_Init();
 
   /* Infinite loop */
   while (1)
   {
-    FLS110_Sensor_Test();
+    QME7E00_Sensor_Test();
     //HAL_Delay(1000);
   }
 }
