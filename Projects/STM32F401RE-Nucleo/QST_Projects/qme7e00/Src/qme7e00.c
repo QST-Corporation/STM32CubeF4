@@ -54,6 +54,7 @@
 #include <stdio.h>
 #include "bsp_uart.h"
 #include "qme7e00.h"
+#include "math.h"
 
 /******************************************************
  *                      Macros
@@ -264,7 +265,7 @@ static qme_status_t QME7E00_data_read(float *pdata)
   flowTemp = (float)((int16_t)regTemp[1] << 8 | regTemp[0])/256;
 
   pressure = 4e-6f*dp_raw*dp_raw + 0.0661f*dp_raw;
-  printf("QME7E00(%d), %d, %.4f, %.1f\n", ret, reading, pressure, flowTemp);
+  //printf("QME7E00(%d), %d, %.4f, %.1f\n", ret, reading, pressure, flowTemp);
   *pdata = pressure;
 
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
@@ -371,14 +372,47 @@ void QME7E00_Sensor_Init(void)
   QME7E00_Sensor_Start();
 }
 
+// 输入：压差、静压、当地温度（华氏摄氏度）
+float cal_true_airspeed(float diff_pressure, float pressure_static, float tempreture_cel){
+    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225f;
+    float CONSTANTS_AIR_GAS_CONST = 287.1f;
+    float TEMPRETURE_ZERO = -273.15f;
+    float air_density = pressure_static / ( (CONSTANTS_AIR_GAS_CONST) * (tempreture_cel - TEMPRETURE_ZERO) );
+
+    float true_airspeed =0.0f;
+    if(diff_pressure > 0.0f){
+        true_airspeed = sqrtf(2.0f  * diff_pressure / air_density) ;
+    }else{
+        true_airspeed = -sqrtf(2.0f * fabsf(diff_pressure) / air_density );
+    }
+
+    return true_airspeed;
+}
+
+// 如果没有静压，只能把当地空气密度估计为海平面15华氏度情况下的密度
+// 这是简化版
+float cal_true_airspeed_lite(float diff_pressure){
+    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225;
+    float true_airspeed = sqrtf(2.0f* diff_pressure / AIR_DENSITY_SEA_LEVEL_15CEL);
+    return true_airspeed;
+}
+
 void QME7E00_Sensor_Test(void)
 {
   float diff_pressure = 0;
   //float pflow = 0.0f;
+  float pressure_static = 101325.0f;
+  float tempreture_cel = 78.8f;
+  float true_airspeed = 0.0f;
+  float true_airspeed_lite = 0.0f;
 
   while(QME7E00_Get_Ready() != QME_READY){
     //HAL_Delay(1);
   }
   QME7E00_data_read(&diff_pressure);
   //QME7E00_pflow_read(&pflow);
+  true_airspeed = cal_true_airspeed(diff_pressure, pressure_static, tempreture_cel);
+
+  true_airspeed_lite = cal_true_airspeed_lite(diff_pressure);
+  printf("dp: %.4f, tas:%.2f, %.2f\n", diff_pressure, true_airspeed, true_airspeed_lite);
 }
