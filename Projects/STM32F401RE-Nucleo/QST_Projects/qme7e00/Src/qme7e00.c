@@ -63,7 +63,7 @@
 #define I2C_SLAVE_ADDR                0x31
 #define I2C_SLAVE_ADDR_READ           ((I2C_SLAVE_ADDR<<1)|1)
 #define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)
-#define QME7E00_TIMEOUT               0xFF //I2C operation timout in ms
+#define QME7E00_TIMEOUT_MS            0x0A //I2C operation timout in ms
 #define QME7E00_MAX_PAYLOAD           0x0C //12U
 #define QME7E00_REG_FW_ID             0x10
 #define QME7E00_REG_UNIQUE_ID         0x11
@@ -190,8 +190,8 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
 static HAL_StatusTypeDef QME_I2C_Read(uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
-  //Status = HAL_I2C_Mem_Read_2(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, QME7E00_TIMEOUT);
-  Status = HAL_I2C_Master_Receive(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, QME7E00_TIMEOUT);
+  //Status = HAL_I2C_Mem_Read_2(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, QME7E00_TIMEOUT_MS);
+  Status = HAL_I2C_Master_Receive(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, QME7E00_TIMEOUT_MS);
   return Status;
 }
 
@@ -199,7 +199,7 @@ static HAL_StatusTypeDef QME_I2C_Write(uint8_t *pData, uint16_t size)
 {
   HAL_StatusTypeDef Status;
 
-  Status = HAL_I2C_Master_Transmit(&hi2c1, I2C_SLAVE_ADDR_WRITE, pData, size, QME7E00_TIMEOUT);
+  Status = HAL_I2C_Master_Transmit(&hi2c1, I2C_SLAVE_ADDR_WRITE, pData, size, QME7E00_TIMEOUT_MS);
   return Status;
 }
 
@@ -245,7 +245,7 @@ static qme_status_t QME7E00_pflow_read(float *pdata)
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
-static qme_status_t QME7E00_data_read(float *pdata)
+static qme_status_t QME7E00_data_read(float *pdata, float *pTemp)
 {
   HAL_StatusTypeDef ret;
   uint8_t	regVal[4]={0}, regTemp[2]={0};
@@ -267,6 +267,7 @@ static qme_status_t QME7E00_data_read(float *pdata)
   pressure = 4e-6f*dp_raw*dp_raw + 0.0661f*dp_raw;
   //printf("QME7E00(%d), %d, %.4f, %.1f\n", ret, reading, pressure, flowTemp);
   *pdata = pressure;
+  *pTemp = flowTemp;
 
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
@@ -278,9 +279,13 @@ static qme_status_t QME7E00_Check_FW_ID(void)
   uint32_t fw_id = 0;
   HAL_StatusTypeDef ret;
 
-  ret = QME7E00_Reg_Read(QME7E00_REG_FW_ID, regVal, sizeof(regVal));
-  printf("FW_ID: %02X,%02X,%02X,%02X\n", regVal[0],regVal[1],regVal[2],regVal[3]);
-  //readoutFwId = regVal[0]
+  // wait for slave ready
+  while ((fw_id != QME7E00_FW_ID) && (fw_id != (QME7E00_FW_ID-1))) {
+    ret = QME7E00_Reg_Read(QME7E00_REG_FW_ID, regVal, sizeof(regVal));
+    fw_id = (uint32_t)regVal[3]<<24 | (uint32_t)regVal[2]<<16 | (uint32_t)regVal[1]<<8 | (uint32_t)regVal[0];
+    printf("FW_ID: 0x%04X\n", fw_id);
+    HAL_Delay(1);
+  }
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
@@ -361,12 +366,18 @@ void QME7E00_Sensor_Start(void)
 
 void QME7E00_Sensor_Stop(void)
 {
-  QME7E00_Set_Mode(QME_MODE_IDLE);
+  qme_status_t ret=QME_ERROR;
+  while (ret != QME_SUCCESS)
+  {
+    HAL_Delay(500);
+    ret = QME7E00_Set_Mode(QME_MODE_IDLE);
+  }
 }
 
 void QME7E00_Sensor_Init(void)
 {
   QME7E00_Check_FW_ID();
+  QME7E00_Sensor_Stop(); //stop sensor first if it is running.
   QME7E00_Check_Unique_ID();
   QME7E00_Set_Avg(8);
   QME7E00_Sensor_Start();
@@ -400,19 +411,25 @@ float cal_true_airspeed_lite(float diff_pressure){
 void QME7E00_Sensor_Test(void)
 {
   float diff_pressure = 0;
+  float temperature = 0;
   //float pflow = 0.0f;
   float pressure_static = 101325.0f;
   float tempreture_cel = 78.8f;
   float true_airspeed = 0.0f;
   float true_airspeed_lite = 0.0f;
+  uint32_t freshTimestamp;
 
   while(QME7E00_Get_Ready() != QME_READY){
-    //HAL_Delay(1);
+    //HAL_Delay(1); //ODR 4ms
   }
-  QME7E00_data_read(&diff_pressure);
+  freshTimestamp = HAL_GetTick();
+  QME7E00_data_read(&diff_pressure, &temperature);
   //QME7E00_pflow_read(&pflow);
   true_airspeed = cal_true_airspeed(diff_pressure, pressure_static, tempreture_cel);
 
   true_airspeed_lite = cal_true_airspeed_lite(diff_pressure);
-  printf("dp: %.4f, tas:%.2f, %.2f\n", diff_pressure, true_airspeed, true_airspeed_lite);
+
+  //mm:ss:ms, diff pressure, True Airspeed, True Airspeed Lite, Air temperature
+  printf("%02d:%02d:%03d DP:%.2f, TAS:%.2f, %.2f, T:%.1f\n", freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000,
+                 diff_pressure, true_airspeed, true_airspeed_lite, temperature);
 }
