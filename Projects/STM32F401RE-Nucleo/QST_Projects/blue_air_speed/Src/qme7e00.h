@@ -31,19 +31,19 @@
 *******************************************************************************/
 
 /******************************************************************************
- * @file    fls110.h
+ * @file    qme7e00.h
  * @author  QST AE team
  * @version V0.1
  * @date    2021-04-13
  * @id      $Id$
- * @brief   This file provides the functions for FLS110 sensor evaluation.
+ * @brief   This file provides the functions for QME7E00 sensor evaluation.
  *
  * @note
  *
  *****************************************************************************/
 
-#ifndef _FLS110_H_
-#define _FLS110_H_
+#ifndef _QME7E00_H_
+#define _QME7E00_H_
 
 #ifdef __cplusplus
 extern "C"
@@ -73,13 +73,12 @@ extern "C"
 /******************************************************
  *             Function Declarations
  ******************************************************/
-void FLS_I2C1_Init(void);
-void FLS110_Sensor_Init(void);
-void FLS110_Sensor_Start(void);
-void FLS110_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pRaw, uint32_t *pTime);
+void QME7E00_Sensor_Init(void);
+void QME7E00_Sensor_Start(void);
+void QME7E00_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pRaw, uint32_t *pTime);
 
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
 
-#endif /* _FLS110_H_ */
+#endif /* _QME7E00_H_ */

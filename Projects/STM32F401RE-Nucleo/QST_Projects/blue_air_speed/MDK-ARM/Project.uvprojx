@@ -434,9 +434,9 @@
               <FilePath>..\Src\air_speed_i2c.c</FilePath>
             </File>
             <File>
-              <FileName>fls110.c</FileName>
+              <FileName>qme7e00.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\Src\fls110.c</FilePath>
+              <FilePath>..\Src\qme7e00.c</FilePath>
             </File>
             <File>
               <FileName>ms4525do.c</FileName>

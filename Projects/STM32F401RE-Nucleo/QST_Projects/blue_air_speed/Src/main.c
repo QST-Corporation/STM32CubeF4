@@ -36,7 +36,7 @@
  * @version V0.1
  * @date    2021-05-28
  * @id      $Id$
- * @brief   This code used to test Flusso FLS110 and TE MS4525 sensor and output the data via debug UART.
+ * @brief   This code used to test QST QME7E00 and TE MS4525 sensor and output the data via debug UART.
  *
  * @note
  *
@@ -48,7 +48,7 @@
 #include "bsp_uart.h"
 #include "version_print.h"
 #include "air_speed_i2c.h"
-#include "fls110.h"
+#include "qme7e00.h"
 #include "ms4525do.h"
 #include "SPL06_01.h"
 #include "flash.h"
@@ -159,13 +159,13 @@ static uint16_t sampleRate = 0;
 void AirSpeedSensorsFetchData(void)
 {
   uint8_t i, flashRet=0;
-  float flsSpeed = 0.0f, flsDP = 0.0f;
+  float qmeSpeed = 0.0f, qmeDP = 0.0f;
   float msPress = 0.0f, msTemp = 0.0f;
   float splPress = 0.0f;
   uint16_t msRaw = 0;
-  uint32_t flsRaw = 0;
+  uint32_t qmeRaw = 0;
   uint32_t msPressRawAndTemp = 0;
-  uint32_t flsTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
+  uint32_t qmeTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
   static uint8_t fistRunFlag = 0, sensorDataLen = 0;
 
@@ -173,13 +173,13 @@ void AirSpeedSensorsFetchData(void)
     fistRunFlag = 1;
     splLastUpdateTime = HAL_GetTick();
   }
-  FLS110_Sensor_Update(&flsSpeed, &flsDP, &flsRaw, &flsTimestamp);
+  QME7E00_Sensor_Update(&qmeSpeed, &qmeDP, &qmeRaw, &qmeTimestamp);
   freshTimestamp = HAL_GetTick();
   HAL_Delay(5);
   MS4525DO_Sensor_Update(&msRaw, &msPress, &msTemp, &msTimestamp);
   msPressRawAndTemp = ((uint32_t)msRaw << 16 ) | (uint32_t)(msTemp*10);
   sensorsSample[0] = freshTimestamp;
-  sensorsSample[1] = flsRaw;//(uint32_t)(flsDP*100);
+  sensorsSample[1] = qmeRaw;//(uint32_t)(qmeDP*100);
   sensorsSample[2] = msPressRawAndTemp;//(msPress*100);
   if ((freshTimestamp - splLastUpdateTime) > 1000) {
     spl0601_update_pressure(&splPress, &splTimestamp);
@@ -188,13 +188,15 @@ void AirSpeedSensorsFetchData(void)
     sensorDataLen = 4;
     //printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
     sampleRate = 0;
-    printf("%ld, %ld, %.2f, %d, %.2f, %.1f, %.2f\n", 
-            freshTimestamp, flsRaw, flsDP, msRaw, msPress, msTemp, splPress);
+    printf("%02d:%02d:%03d %ld, %.2f, %d, %.2f, %.1f, %.2f\n", \
+            freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000, \
+            qmeRaw, qmeDP, msRaw, msPress, msTemp, splPress);
   } else {
     sensorDataLen = 3;
     sampleRate ++;
-    printf("%ld, %ld, %.2f, %d, %.2f, %.1f\n", 
-            freshTimestamp, flsRaw, flsDP, msRaw, msPress, msTemp);
+    printf("%02d:%02d:%03d %ld, %.2f, %d, %.2f, %.1f\n", \
+            freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000, \
+            qmeRaw, qmeDP, msRaw, msPress, msTemp);
   }
 
   //store sensor data to flash:
@@ -287,7 +289,7 @@ int main(void)
 
   /* Perform I2C initialization for Air Speed sensors*/
   Air_Speed_I2C1_Init();
-  FLS110_Sensor_Init();
+  QME7E00_Sensor_Init();
   spl0601_init_and_start();
   Check_data();
   //splLastUpdateTime = HAL_GetTick();
