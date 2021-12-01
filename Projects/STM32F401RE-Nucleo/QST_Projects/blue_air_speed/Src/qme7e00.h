@@ -75,7 +75,7 @@ extern "C"
  ******************************************************/
 void QME7E00_Sensor_Init(void);
 void QME7E00_Sensor_Start(void);
-void QME7E00_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pRaw, uint32_t *pTime);
+void QME7E00_Sensor_Update(uint32_t *pRaw, float *pDp, float *pTemp, uint32_t *pTime);
 
 #ifdef __cplusplus
 } /* extern "C" */

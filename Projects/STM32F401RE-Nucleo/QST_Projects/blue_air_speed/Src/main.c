@@ -52,6 +52,7 @@
 #include "ms4525do.h"
 #include "SPL06_01.h"
 #include "flash.h"
+#include "math.h" //for sqrtf()
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -156,12 +157,37 @@ static void BSP_Device_Init(void)
   BSP_UART_Init();
 }
 
+// 输入：压差、静压、当地温度（华氏摄氏度）
+static float cal_true_airspeed(float diff_pressure, float pressure_static, float tempreture_cel){
+    //float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225f;
+    float CONSTANTS_AIR_GAS_CONST = 287.1f;
+    float TEMPRETURE_ZERO = -273.15f;
+    float air_density = pressure_static / ( (CONSTANTS_AIR_GAS_CONST) * (tempreture_cel - TEMPRETURE_ZERO) );
+
+    float true_airspeed =0.0f;
+    if(diff_pressure > 0.0f){
+        true_airspeed = sqrtf(2.0f  * diff_pressure / air_density) ;
+    }else{
+        true_airspeed = -sqrtf(2.0f * fabsf(diff_pressure) / air_density );
+    }
+
+    return true_airspeed;
+}
+
+// 如果没有静压，只能把当地空气密度估计为海平面15华氏度情况下的密度
+// 这是简化版
+static float cal_true_airspeed_lite(float diff_pressure){
+    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225;
+    float true_airspeed = sqrtf(2.0f* diff_pressure / AIR_DENSITY_SEA_LEVEL_15CEL);
+    return true_airspeed;
+}
+
 static uint16_t sampleRate = 0;
 void AirSpeedSensorsFetchData(void)
 {
   uint8_t i, flashRet=0;
-  float qmeSpeed = 0.0f, qmeDP = 0.0f;
-  float msPress = 0.0f, msTemp = 0.0f;
+  float qmeSpeed = 0.0f, qmeDP = 0.0f, qmeTemp = 0.0f;
+  float msSpeed = 0.0f, msPress = 0.0f, msTemp = 0.0f;
   float splPress = 0.0f;
   uint16_t msRaw = 0;
   uint32_t qmeRaw = 0;
@@ -169,16 +195,20 @@ void AirSpeedSensorsFetchData(void)
   uint32_t qmeTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
   static uint8_t fistRunFlag = 0, sensorDataLen = 0;
+  static float pressure_static = 101325.0f;
+  static float tempreture_cel = 78.8f;
 
   if (fistRunFlag == 0) {
     fistRunFlag = 1;
     splLastUpdateTime = HAL_GetTick();
   }
-  QME7E00_Sensor_Update(&qmeSpeed, &qmeDP, &qmeRaw, &qmeTimestamp);
+  QME7E00_Sensor_Update(&qmeRaw, &qmeDP, &qmeTemp, &qmeTimestamp);
   freshTimestamp = HAL_GetTick();
+  qmeSpeed = cal_true_airspeed(qmeDP, pressure_static, tempreture_cel);
   HAL_Delay(5);
   MS4525DO_Sensor_Update(&msRaw, &msPress, &msTemp, &msTimestamp);
   msPressRawAndTemp = ((uint32_t)msRaw << 16 ) | (uint32_t)(msTemp*10);
+  msSpeed = cal_true_airspeed(msPress, pressure_static, tempreture_cel);
   sensorsSample[0] = freshTimestamp;
   sensorsSample[1] = qmeRaw;//(uint32_t)(qmeDP*100);
   sensorsSample[2] = msPressRawAndTemp;//(msPress*100);
@@ -188,16 +218,21 @@ void AirSpeedSensorsFetchData(void)
     sensorsSample[3] = (uint32_t)(splPress*100);
     sensorDataLen = 4;
     //printf("%ld: 16, %d\n", splLastUpdateTime, sampleRate+1);
+    if(splPress > 0) {
+      pressure_static = splPress; //update the static pressure.
+    }
     sampleRate = 0;
-    printf("%02d:%02d:%03d %ld, %.2f, %d, %.2f, %.1f, %.2f\n", \
+    //timestamp: MS_dp, QME_dp, MS_TAS, QME_TAS, MS_temp, QME_temp, barometer
+    printf("%02d:%02d:%03d %.2f, %.2f, %.2f, %.2f, %.1f, %.1f, %.2f\n", \
             freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000, \
-            qmeRaw, qmeDP, msRaw, msPress, msTemp, splPress);
+            msPress, qmeDP, msSpeed, qmeSpeed, msTemp, qmeTemp, splPress);
   } else {
     sensorDataLen = 3;
     sampleRate ++;
-    printf("%02d:%02d:%03d %ld, %.2f, %d, %.2f, %.1f\n", \
+    //timestamp: MS_dp, QME_dp, MS_TAS, QME_TAS, MS_temp, QME_temp
+    printf("%02d:%02d:%03d %.2f, %.2f, %.2f, %.2f, %.1f, %.1f\n", \
             freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000, \
-            qmeRaw, qmeDP, msRaw, msPress, msTemp);
+            msPress, qmeDP, msSpeed, qmeSpeed, msTemp, qmeTemp);
   }
 
 #if (AS_SENSOR_DATA_STORE_ENABLE)
@@ -210,12 +245,18 @@ void AirSpeedSensorsFetchData(void)
       break;
     }
   }
+#else //#if (AS_SENSOR_DATA_STORE_ENABLE)
+  UNUSED(i);
+  UNUSED(flashRet);
+  UNUSED(sensorDataLen);
+  UNUSED(sensorsSample);
 #endif //#if (AS_SENSOR_DATA_STORE_ENABLE)
 
 }
 
 void UartFlashReadHanlder(void)
 {
+#if (AS_SENSOR_DATA_STORE_ENABLE)
   uint8_t dataAvailable = 0;
   uint32_t sensorSamples[4] = {0};
   uint32_t splLastUpdateTime = 0, byteCnt = 0, flashByteCnt = 0;
@@ -225,7 +266,6 @@ void UartFlashReadHanlder(void)
   uint16_t msRaw;
   float msTemp = 0.0f;
 
-#if (AS_SENSOR_DATA_STORE_ENABLE)
   //printf("uartFlashReadCmd\n");
   memset(flashData, 0x00, sizeof(flashData));
   dataAvailable = Read_Data(flashData);

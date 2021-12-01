@@ -181,7 +181,7 @@ static qme_status_t QME7E00_pflow_read(float *pdata)
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }
 
-static qme_status_t QME7E00_data_read(float *pDp, uint32_t *pRaw, uint32_t *pTime)
+static qme_status_t QME7E00_data_read(float *pDp, uint32_t *pRaw, float *pTemp, uint32_t *pTime)
 {
   HAL_StatusTypeDef ret;
   uint8_t	regVal[4]={0}, regTemp[2]={0};
@@ -209,6 +209,7 @@ static qme_status_t QME7E00_data_read(float *pDp, uint32_t *pRaw, uint32_t *pTim
   //}
   *pDp = pressure;
   *pRaw = reading;
+  *pTemp = flowTemp;
   *pTime = timestamp;
 
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
@@ -325,47 +326,17 @@ void QME7E00_Sensor_Init(void)
   QME7E00_Sensor_Start();
 }
 
-// 输入：压差、静压、当地温度（华氏摄氏度）
-float cal_true_airspeed(float diff_pressure, float pressure_static, float tempreture_cel){
-    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225f;
-    float CONSTANTS_AIR_GAS_CONST = 287.1f;
-    float TEMPRETURE_ZERO = -273.15f;
-    float air_density = pressure_static / ( (CONSTANTS_AIR_GAS_CONST) * (tempreture_cel - TEMPRETURE_ZERO) );
-
-    float true_airspeed =0.0f;
-    if(diff_pressure > 0.0f){
-        true_airspeed = sqrtf(2.0f  * diff_pressure / air_density) ;
-    }else{
-        true_airspeed = -sqrtf(2.0f * fabsf(diff_pressure) / air_density );
-    }
-
-    return true_airspeed;
-}
-
-// 如果没有静压，只能把当地空气密度估计为海平面15华氏度情况下的密度
-// 这是简化版
-float cal_true_airspeed_lite(float diff_pressure){
-    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225;
-    float true_airspeed = sqrtf(2.0f* diff_pressure / AIR_DENSITY_SEA_LEVEL_15CEL);
-    return true_airspeed;
-}
-
-void QME7E00_Sensor_Update(float *pSpeed, float *pDp, uint32_t *pRaw, uint32_t *pTime)
+void QME7E00_Sensor_Update(uint32_t *pRaw, float *pDp, float *pTemp, uint32_t *pTime)
 {
-  float true_airspeed = 0.0f;
   //float pflow = 0.0f;
-  float pressure_static = 101325.0f;
-  float tempreture_cel = 78.8f;
 
-  if((pSpeed == NULL) || (pDp == NULL) || (pRaw == NULL) || (pTime == NULL))
+  if((pRaw == NULL) || (pDp == NULL) || (pTemp == NULL) || (pTime == NULL))
   {
     return;
   }
 
   if(QME7E00_Get_Ready() == QME_READY){
-    QME7E00_data_read(pDp, pRaw, pTime);
+    QME7E00_data_read(pDp, pRaw, pTemp, pTime);
     //QME7E00_pflow_read(&pflow);
-    true_airspeed = cal_true_airspeed(*pDp, pressure_static, tempreture_cel);
-    *pSpeed = true_airspeed;
   }
 }
