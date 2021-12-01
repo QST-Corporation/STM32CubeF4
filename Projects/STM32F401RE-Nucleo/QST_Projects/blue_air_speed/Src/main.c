@@ -57,6 +57,7 @@
 /* Private define ------------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
+#define AS_SENSOR_DATA_STORE_ENABLE       false//true
 /* Private variables ---------------------------------------------------------*/
 uint32_t splLastUpdateTime;
 uint8_t flashData[1040];
@@ -199,6 +200,7 @@ void AirSpeedSensorsFetchData(void)
             qmeRaw, qmeDP, msRaw, msPress, msTemp);
   }
 
+#if (AS_SENSOR_DATA_STORE_ENABLE)
   //store sensor data to flash:
   for (i=0; i<sensorDataLen; i++) {
     flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
@@ -208,6 +210,8 @@ void AirSpeedSensorsFetchData(void)
       break;
     }
   }
+#endif //#if (AS_SENSOR_DATA_STORE_ENABLE)
+
 }
 
 void UartFlashReadHanlder(void)
@@ -221,6 +225,7 @@ void UartFlashReadHanlder(void)
   uint16_t msRaw;
   float msTemp = 0.0f;
 
+#if (AS_SENSOR_DATA_STORE_ENABLE)
   //printf("uartFlashReadCmd\n");
   memset(flashData, 0x00, sizeof(flashData));
   dataAvailable = Read_Data(flashData);
@@ -262,6 +267,9 @@ void UartFlashReadHanlder(void)
     dataAvailable = Read_Data(&flashData[restDataCnt]);
     flashByteCnt = restDataCnt + 1024;
   }
+#else  //#if (AS_SENSOR_DATA_STORE_ENABLE)
+  printf("flash store is disabled\n");
+#endif //#if (AS_SENSOR_DATA_STORE_ENABLE)
 }
 
 /**
