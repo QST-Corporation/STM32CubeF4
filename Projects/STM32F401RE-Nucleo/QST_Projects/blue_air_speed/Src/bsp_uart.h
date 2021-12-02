@@ -31,7 +31,7 @@
 *******************************************************************************/
 
 /******************************************************************************
- * @file    bsp_uart.c
+ * @file    bsp_uart.h
  * @author  QST AE team
  * @version V0.1
  * @date    2021-01-21
@@ -59,6 +59,12 @@ extern "C"
 /******************************************************
  *                      Macros
  ******************************************************/
+#define AIRSPEED_START_EVT            0x0001
+#define AIRSPEED_STOP_EVT             0x0002
+#define AIRSPEED_BUTTON_TOGGLE_EVT    0x0004
+#define AIRSPEED_TIMER_TIMEOUT_EVT    0x0008
+#define AIRSPEED_FLASH_READ_EVT       0x0010
+#define AIRSPEED_FLASH_ERASE_EVT      0x0020
 
 /******************************************************
  *                    Constants
@@ -75,14 +81,16 @@ extern "C"
 /******************************************************
  *             Function Declarations
  ******************************************************/
-int BSP_COM_Write(const uint8_t* data_out, uint32_t size);
-int BSP_COM_Read(uint8_t* data_in, uint32_t expected_data_size, uint32_t timeout_ms);
+int BSP_COM_Write(const uint8_t* data_out, uint16_t size);
+int BSP_COM_Read(uint8_t* data_in, uint16_t expected_data_size, uint32_t timeout_ms);
 //int BSP_COM_BytesInBuffer(void);
 //void BSP_COM_IRQHandler(void);
 void BSP_UART_Init(void);
 void BSP_STDIO_Read(uint8_t *data, uint16_t size);
 void BSP_Button_Init(void);
 void BSP_Button_Polling(void);
+void bsp_set_event(uint16_t evt);
+uint16_t bsp_get_event(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

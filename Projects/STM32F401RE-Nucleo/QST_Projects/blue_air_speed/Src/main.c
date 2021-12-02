@@ -63,10 +63,7 @@
 TIM_HandleTypeDef    AirSpeedTimHandle;
 uint32_t splLastUpdateTime;
 uint8_t flashData[1040];
-volatile bool sensorIsRunning = false;
-volatile bool sensorTimerPeriodElapsed = false;
-extern volatile bool sensorEnable;
-extern bool uartFlashReadCmd;
+extern volatile uint16_t bspEventFlag;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -316,7 +313,7 @@ void AirSpeedSensorsFetchData(void)
   for (i=0; i<sensorDataLen; i++) {
     flashRet = Store_Data((uint8_t *)&sensorsSample[i], sizeof(uint32_t));
     if (flashRet == 0) {
-      sensorEnable = false;
+      bsp_set_event(AIRSPEED_STOP_EVT);
       printf("Store_Data: 0\n");
       break;
     }
@@ -397,7 +394,79 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   //it's in ISR, should not invoke the sensor data sampling here.
   //instead of issuing event.
-  sensorTimerPeriodElapsed = true;
+  bsp_set_event(AIRSPEED_TIMER_TIMEOUT_EVT);
+}
+
+static void AirSpeedSensorStart(bool *isRunning)
+{
+  printf("START\n");
+  BSP_LED_On(LED2);
+  AirSpeedSensor_Timer_Init_And_Start(1000);
+  *isRunning = true;
+}
+
+static void AirSpeedSensorStop(bool *isRunning)
+{
+  printf("STOP\n");
+  BSP_LED_Off(LED2);
+  AirSpeedSensor_Timer_Stop();
+  *isRunning = false;
+}
+
+uint16_t AirSpeedProcessEvent(uint16_t events)
+{
+  static bool sensorIsRunning = false;
+  if (events & AIRSPEED_START_EVT)
+  {
+    if(!sensorIsRunning)
+    {
+      AirSpeedSensorStart(&sensorIsRunning);
+    }
+    return (events ^ AIRSPEED_START_EVT);
+  }
+
+  if (events & AIRSPEED_STOP_EVT)
+  {
+    if(sensorIsRunning)
+    {
+      AirSpeedSensorStop(&sensorIsRunning);
+    }
+    return (events ^ AIRSPEED_STOP_EVT);
+  }
+
+  if (events & AIRSPEED_BUTTON_TOGGLE_EVT)
+  {
+    if(sensorIsRunning) {
+      AirSpeedSensorStop(&sensorIsRunning);
+    } else {
+      AirSpeedSensorStart(&sensorIsRunning);
+    }
+    return (events ^ AIRSPEED_BUTTON_TOGGLE_EVT);
+  }
+
+  if (events & AIRSPEED_TIMER_TIMEOUT_EVT)
+  {
+    //printf("TIM_EVT\n");
+    AirSpeedSensorsFetchData();
+    return (events ^ AIRSPEED_TIMER_TIMEOUT_EVT);
+  }
+
+  if (events & AIRSPEED_FLASH_READ_EVT)
+  {
+    AirSpeedSensorStop(&sensorIsRunning);
+    printf("READ_EVT\n");
+    UartFlashReadHanlder();
+    return (events ^ AIRSPEED_FLASH_READ_EVT);
+  }
+
+  if (events & AIRSPEED_FLASH_ERASE_EVT)
+  {
+    AirSpeedSensorStop(&sensorIsRunning);
+    printf("Erase flash...\n");
+    Erase_data();
+    return (events ^ AIRSPEED_FLASH_ERASE_EVT);
+  }
+  return 0;
 }
 
 /**
@@ -433,28 +502,7 @@ int main(void)
   /* Infinite loop */
   while (1)
   {
-    if (sensorEnable) {
-      if(!sensorIsRunning)
-      {
-        sensorIsRunning = true;
-        AirSpeedSensor_Timer_Init_And_Start(1000);
-      }
-      if(sensorTimerPeriodElapsed)
-      {
-        sensorTimerPeriodElapsed = false;
-        AirSpeedSensorsFetchData();
-      }
-    } else {
-      if(sensorIsRunning)
-      {
-        sensorIsRunning = false;
-        AirSpeedSensor_Timer_Stop();
-      }
-      if (uartFlashReadCmd) {
-        UartFlashReadHanlder();
-        uartFlashReadCmd = false;
-      }
-    }
+    bspEventFlag = AirSpeedProcessEvent(bspEventFlag);
     BSP_Button_Polling();
   }
 }

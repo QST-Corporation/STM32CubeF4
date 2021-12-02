@@ -50,6 +50,7 @@
 #include <stdio.h>
 #include "stm32f4xx_hal.h"
 #include "stm32f4xx_nucleo.h"
+#include "bsp_uart.h"
 /******************************************************
  *                      Macros
  ******************************************************/
@@ -124,10 +125,7 @@ typedef struct
 /******************************************************
  *                 Global Variables
  ******************************************************/
-//bool fls110Log = false;
-//bool ms4525Log = false;
-volatile bool sensorEnable = false;
-bool uartFlashReadCmd = false;
+volatile uint16_t bspEventFlag = 0;
 
 /******************************************************
  *                 Static Variables
@@ -185,12 +183,12 @@ void UartCmdParse(void)
   uint8_t sensorStart[] = "sensorStart";
   printf("UartCmd: %s\n", uart_cmd_str);
   if (memcmp(uart_cmd_str, sensorStop, sizeof(sensorStop)-1) == 0){
-    sensorEnable = false;
+    bsp_set_event(AIRSPEED_STOP_EVT);
   } else if (memcmp(uart_cmd_str, sensorStart, sizeof(sensorStart)-1) == 0){
-    sensorEnable = true;
+    bsp_set_event(AIRSPEED_START_EVT);
   } else if (memcmp(uart_cmd_str, flashReadCmd, sizeof(flashReadCmd)-1) == 0)
   {
-    uartFlashReadCmd = true;
+    bsp_set_event(AIRSPEED_FLASH_READ_EVT);
   }
 
 }
@@ -400,7 +398,7 @@ void BSP_COM_DeInit(void)
   HAL_GPIO_DeInit(USART_COM_RX_GPIO_PORT, USART_COM_RX_PIN);
 }
 
-int BSP_COM_Write(const uint8_t* data_out, uint32_t size)
+int BSP_COM_Write(const uint8_t* data_out, uint16_t size)
 {
   HAL_UART_Transmit(&UartCom, (uint8_t*)data_out, size, 0xF);
 
@@ -459,13 +457,12 @@ void BSP_Button_Polling(void)
     if (buttonStatus == GPIO_PIN_RESET) {
       if ((shortPressed == false) && (longPressed == false)) {
         pressedFreshTime = HAL_GetTick();
-        printf("short pressed\n");
+        //printf("short pressed\n");
         shortPressed = true;
       }else if((HAL_GetTick() - pressedFreshTime) > 3000){
         if (longPressed == false) {
           printf("long Pressed\n");
           longPressed = true;
-          sensorEnable = false;
           shortPressed = false;
         } else if ((HAL_GetTick() - ledFreshTime) > 200) {
           ledFreshTime = HAL_GetTick();
@@ -479,19 +476,21 @@ void BSP_Button_Polling(void)
     if(buttonStatus == GPIO_PIN_SET) {
       if (shortPressed) {
         shortPressed = false;
-        if (sensorEnable) {
-          sensorEnable = false;
-          BSP_LED_Off(LED2);
-        } else {
-          sensorEnable = true;
-          BSP_LED_On(LED2);
-        }
+        bsp_set_event(AIRSPEED_BUTTON_TOGGLE_EVT);
       } else if (longPressed) {
         longPressed = false;
-        BSP_LED_Off(LED2);
-        printf("Erase flash...\n");
-        Erase_data();
+        bsp_set_event(AIRSPEED_FLASH_ERASE_EVT);
       }
     }
   }
+}
+
+void bsp_set_event(uint16_t evt)
+{
+  bspEventFlag |= evt;
+}
+
+uint16_t bsp_get_event(void)
+{
+  return bspEventFlag;
 }
