@@ -54,6 +54,7 @@
 
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
+extern TIM_HandleTypeDef  AirSpeedTimHandle;
 extern UART_HandleTypeDef UartStdio;
 /******************************************************************************/
 /*            Cortex-M4 Processor Exceptions Handlers                         */
@@ -180,6 +181,16 @@ void SysTick_Handler(void)
 /*  available peripheral interrupt handler's name please refer to the startup */
 /*  file (startup_stm32f4xx.s).                                               */
 /******************************************************************************/
+/**
+  * @brief  This function handles TIM interrupt request.
+  * @param  None
+  * @retval None
+  */
+void TIM3_IRQHandler(void)
+{
+  HAL_TIM_IRQHandler(&AirSpeedTimHandle);
+}
+
 /**
   * @brief  This function handles UART interrupt request.  
   * @param  None

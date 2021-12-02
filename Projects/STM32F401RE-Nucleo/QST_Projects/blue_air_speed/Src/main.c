@@ -60,8 +60,11 @@
 /* Private macro -------------------------------------------------------------*/
 #define AS_SENSOR_DATA_STORE_ENABLE       false//true
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef    AirSpeedTimHandle;
 uint32_t splLastUpdateTime;
 uint8_t flashData[1040];
+volatile bool sensorIsRunning = false;
+volatile bool sensorTimerPeriodElapsed = false;
 extern volatile bool sensorEnable;
 extern bool uartFlashReadCmd;
 
@@ -155,6 +158,79 @@ static void BSP_Device_Init(void)
 
   /* Configure LOG UART and Communication UART */
   BSP_UART_Init();
+}
+
+static void AirSpeedSensor_Timer_Init_And_Start(uint32_t periodMs)
+{
+ /*##-1- Configure the TIM peripheral #######################################*/ 
+  /* -----------------------------------------------------------------------
+    In this example TIM3 input clock (TIM3CLK) is set to 2 * APB1 clock (PCLK1), 
+    since APB1 prescaler is different from 1.   
+      TIM3CLK = 2 * PCLK1
+      PCLK1 = HCLK / 2
+      => TIM3CLK = HCLK = SystemCoreClock
+    To get TIM3 counter clock at 1KHz, the Prescaler is computed as following:
+    Prescaler = (TIM3CLK / TIM3 counter clock) - 1
+    Prescaler = (SystemCoreClock /1000) - 1
+       
+    Note: 
+     SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
+     Each time the core clock (HCLK) changes, user had to update SystemCoreClock 
+     variable value. Otherwise, any configuration based on this variable will be incorrect.
+     This variable is updated in three ways:
+      1) by calling CMSIS function SystemCoreClockUpdate()
+      2) by calling HAL API function HAL_RCC_GetSysClockFreq()
+      3) each time HAL_RCC_ClockConfig() is called to configure the system clock frequency  
+  ----------------------------------------------------------------------- */  
+
+  /*##-1.1- Enable peripherals and GPIO Clocks #################################*/
+  /* TIMx Peripheral clock enable */
+  __HAL_RCC_TIM3_CLK_ENABLE();
+  /*##-1.2- Configure the NVIC for TIMx ########################################*/
+  /* Set Interrupt Group Priority */ 
+  HAL_NVIC_SetPriority(TIM3_IRQn, 4, 0);
+  /* Enable the TIMx global Interrupt */
+  HAL_NVIC_EnableIRQ(TIM3_IRQn);
+
+  /* Compute the prescaler value to have TIM3 counter clock equal to periodMs */
+  uint32_t uwPrescalerValue = (uint32_t) (((SystemCoreClock/2) / 1000) - 1);
+
+  /* Set TIM3 instance */
+  AirSpeedTimHandle.Instance = TIM3;
+   
+  /* Initialize TIM3 peripheral as follow:
+       + Period = periodMs - 1
+       + Prescaler = ((SystemCoreClock/2)/periodMs) - 1
+       + ClockDivision = 0
+       + Counter direction = Up
+  */
+  AirSpeedTimHandle.Init.Period = periodMs*2 - 1;
+  AirSpeedTimHandle.Init.Prescaler = uwPrescalerValue;
+  AirSpeedTimHandle.Init.ClockDivision = 0;
+  AirSpeedTimHandle.Init.CounterMode = TIM_COUNTERMODE_UP;
+  AirSpeedTimHandle.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if(HAL_TIM_Base_Init(&AirSpeedTimHandle) != HAL_OK)
+  {
+    /* Initialization Error */
+    Error_Handler();
+  }
+
+  /*##-2- Start the TIM Base generation in interrupt mode ####################*/
+  /* Start Channel1 */
+  if(HAL_TIM_Base_Start_IT(&AirSpeedTimHandle) != HAL_OK)
+  {
+    /* Starting Error */
+    Error_Handler();
+  }
+}
+
+static void AirSpeedSensor_Timer_Stop(void)
+{
+  if(HAL_TIM_Base_Stop_IT(&AirSpeedTimHandle) != HAL_OK)
+  {
+    /* Starting Error */
+    Error_Handler();
+  }
 }
 
 // 输入：压差、静压、当地温度（华氏摄氏度）
@@ -313,6 +389,18 @@ void UartFlashReadHanlder(void)
 }
 
 /**
+  * @brief  Period elapsed callback in non blocking mode
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  //it's in ISR, should not invoke the sensor data sampling here.
+  //instead of issuing event.
+  sensorTimerPeriodElapsed = true;
+}
+
+/**
   * @brief  Main program
   * @param  None
   * @retval None
@@ -346,11 +434,26 @@ int main(void)
   while (1)
   {
     if (sensorEnable) {
-      AirSpeedSensorsFetchData();
-      HAL_Delay(10);
-    } else if (uartFlashReadCmd) {
-      UartFlashReadHanlder();
-      uartFlashReadCmd = false;
+      if(!sensorIsRunning)
+      {
+        sensorIsRunning = true;
+        AirSpeedSensor_Timer_Init_And_Start(1000);
+      }
+      if(sensorTimerPeriodElapsed)
+      {
+        sensorTimerPeriodElapsed = false;
+        AirSpeedSensorsFetchData();
+      }
+    } else {
+      if(sensorIsRunning)
+      {
+        sensorIsRunning = false;
+        AirSpeedSensor_Timer_Stop();
+      }
+      if (uartFlashReadCmd) {
+        UartFlashReadHanlder();
+        uartFlashReadCmd = false;
+      }
     }
     BSP_Button_Polling();
   }
