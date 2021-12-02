@@ -284,7 +284,7 @@ static qme_status_t QME7E00_Check_FW_ID(void)
     ret = QME7E00_Reg_Read(QME7E00_REG_FW_ID, regVal, sizeof(regVal));
     fw_id = (uint32_t)regVal[3]<<24 | (uint32_t)regVal[2]<<16 | (uint32_t)regVal[1]<<8 | (uint32_t)regVal[0];
     printf("FW_ID: 0x%04X\n", fw_id);
-    HAL_Delay(1);
+    HAL_Delay(100);
   }
   return ret == HAL_OK ? QME_SUCCESS : QME_ERROR;
 }

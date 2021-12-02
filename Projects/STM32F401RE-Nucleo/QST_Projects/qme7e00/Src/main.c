@@ -175,7 +175,7 @@ int main(void)
   while (1)
   {
     QME7E00_Sensor_Test();
-    //HAL_Delay(1000);
+    HAL_Delay(100);
   }
 }
 
