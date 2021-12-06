@@ -296,14 +296,14 @@ void AirSpeedSensorsFetchData(void)
     }
     sampleRate = 0;
     //timestamp: MS_dp, QME_dp, MS_TAS, QME_TAS, MS_temp, QME_temp, barometer
-    printf("%02d:%02d:%03d %.2f, %.2f, %.2f, %.2f, %.1f, %.1f, %.2f\n", \
+    printf("%02d:%02d:%03d,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f,%.2f\n", \
             freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000, \
             msPress, qmeDP, msSpeed, qmeSpeed, msTemp, qmeTemp, splPress);
   } else {
     sensorDataLen = 3;
     sampleRate ++;
     //timestamp: MS_dp, QME_dp, MS_TAS, QME_TAS, MS_temp, QME_temp
-    printf("%02d:%02d:%03d %.2f, %.2f, %.2f, %.2f, %.1f, %.1f\n", \
+    printf("%02d:%02d:%03d,%.2f,%.2f,%.2f,%.2f,%.1f,%.1f\n", \
             freshTimestamp/60000, (freshTimestamp%60000)/1000, (freshTimestamp%60000)%1000, \
             msPress, qmeDP, msSpeed, qmeSpeed, msTemp, qmeTemp);
   }
@@ -401,7 +401,7 @@ static void AirSpeedSensorStart(bool *isRunning)
 {
   printf("START\n");
   BSP_LED_On(LED2);
-  AirSpeedSensor_Timer_Init_And_Start(1000);
+  AirSpeedSensor_Timer_Init_And_Start(100);
   *isRunning = true;
 }
 

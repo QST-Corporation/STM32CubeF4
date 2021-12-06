@@ -133,6 +133,7 @@ void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, float *pTemp, uint32_t
   const float PSI_to_Pa = 6894.757f;
   int16_t dp_raw = 0, temp_raw = 0;
   float temperature = 0, dp_psi = 0, dp_pa = 0;
+  float _diff_pres_offset = 77.33;//77.33; //Initialize the calibration offset
   uint32_t timestamp = 0;
 
   if ((raw == NULL) || (pPress == NULL) || (pTemp == NULL) || (pTime == NULL)) {
@@ -174,7 +175,8 @@ void MS4525DO_Sensor_Update(uint16_t *raw, float *pPress, float *pTemp, uint32_t
   temperature = (float)temp_raw*200/2047 - 50; //came from datasheet page4/14
 
   *raw = dp_raw;
-  *pPress = dp_pa;
+  //*pPress = dp_pa;
+  *pPress = dp_pa - _diff_pres_offset;
   *pTemp = temperature;
   *pTime = timestamp;
   //if (ms4525Log) {
