@@ -383,7 +383,7 @@ void QME7E00_Sensor_Init(void)
   QME7E00_Sensor_Start();
 }
 
-// 输入：压差、静压、当地温度（华氏摄氏度）
+// Input：diff pressure, static pressure, air temperature(degree celsius)
 float cal_true_airspeed(float diff_pressure, float pressure_static, float tempreture_cel){
     float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225f;
     float CONSTANTS_AIR_GAS_CONST = 287.1f;
@@ -400,10 +400,10 @@ float cal_true_airspeed(float diff_pressure, float pressure_static, float tempre
     return true_airspeed;
 }
 
-// 如果没有静压，只能把当地空气密度估计为海平面15华氏度情况下的密度
+// 如果没有静压，只能把当地空气密度估计为海平面15摄氏度情况下的密度
 // 这是简化版
 float cal_true_airspeed_lite(float diff_pressure){
-    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225;
+    float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225f;
     float true_airspeed = sqrtf(2.0f* diff_pressure / AIR_DENSITY_SEA_LEVEL_15CEL);
     return true_airspeed;
 }
@@ -414,7 +414,7 @@ void QME7E00_Sensor_Test(void)
   float temperature = 0;
   //float pflow = 0.0f;
   float pressure_static = 101325.0f;
-  float tempreture_cel = 78.8f;
+  //float tempreture_cel = 26.0f;
   float true_airspeed = 0.0f;
   float true_airspeed_lite = 0.0f;
   uint32_t freshTimestamp;
@@ -425,7 +425,7 @@ void QME7E00_Sensor_Test(void)
   freshTimestamp = HAL_GetTick();
   QME7E00_data_read(&diff_pressure, &temperature);
   //QME7E00_pflow_read(&pflow);
-  true_airspeed = cal_true_airspeed(diff_pressure, pressure_static, tempreture_cel);
+  true_airspeed = cal_true_airspeed(diff_pressure, pressure_static, temperature);
 
   true_airspeed_lite = cal_true_airspeed_lite(diff_pressure);
 
