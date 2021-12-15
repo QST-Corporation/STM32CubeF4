@@ -230,7 +230,7 @@ static void AirSpeedSensor_Timer_Stop(void)
   }
 }
 
-// 输入：压差、静压、当地温度（华氏摄氏度）
+// Input：diff pressure, static pressure, air temperature(degree celsius)
 static float cal_true_airspeed(float diff_pressure, float pressure_static, float tempreture_cel){
     //float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225f;
     float CONSTANTS_AIR_GAS_CONST = 287.1f;
@@ -247,8 +247,7 @@ static float cal_true_airspeed(float diff_pressure, float pressure_static, float
     return true_airspeed;
 }
 
-// 如果没有静压，只能把当地空气密度估计为海平面15华氏度情况下的密度
-// 这是简化版
+// if no static pressure, just use the 15 celsius sea level air density instead
 static float cal_true_airspeed_lite(float diff_pressure){
     float AIR_DENSITY_SEA_LEVEL_15CEL = 1.225;
     float true_airspeed = sqrtf(2.0f* diff_pressure / AIR_DENSITY_SEA_LEVEL_15CEL);
@@ -269,7 +268,7 @@ void AirSpeedSensorsFetchData(void)
   uint32_t sensorsSample[4] = {0,};
   static uint8_t fistRunFlag = 0, sensorDataLen = 0;
   static float pressure_static = 101325.0f;
-  static float tempreture_cel = 78.8f;
+  //static float tempreture_cel = 26.0f;
 
   if (fistRunFlag == 0) {
     fistRunFlag = 1;
@@ -277,11 +276,11 @@ void AirSpeedSensorsFetchData(void)
   }
   QME7E00_Sensor_Update(&qmeRaw, &qmeDP, &qmeTemp, &qmeTimestamp);
   freshTimestamp = HAL_GetTick();
-  qmeSpeed = cal_true_airspeed(qmeDP, pressure_static, tempreture_cel);
+  qmeSpeed = cal_true_airspeed(qmeDP, pressure_static, qmeTemp);
   HAL_Delay(5);
   MS4525DO_Sensor_Update(&msRaw, &msPress, &msTemp, &msTimestamp);
   msPressRawAndTemp = ((uint32_t)msRaw << 16 ) | (uint32_t)(msTemp*10);
-  msSpeed = cal_true_airspeed(msPress, pressure_static, tempreture_cel);
+  msSpeed = cal_true_airspeed(msPress, pressure_static, msTemp);
   sensorsSample[0] = freshTimestamp;
   sensorsSample[1] = qmeRaw;//(uint32_t)(qmeDP*100);
   sensorsSample[2] = msPressRawAndTemp;//(msPress*100);
