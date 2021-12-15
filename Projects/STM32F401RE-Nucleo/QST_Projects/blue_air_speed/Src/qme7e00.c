@@ -201,7 +201,7 @@ static qme_status_t QME7E00_data_read(float *pDp, uint32_t *pRaw, float *pTemp, 
   QME7E00_Reg_Read(QME7E00_REG_FLOW_TEMP, regTemp, sizeof(regTemp));
   flowTemp = (float)((int16_t)regTemp[1] << 8 | regTemp[0])/256;
 
-  pressure = 4e-6f*dp_raw*dp_raw + 0.0661f*dp_raw;
+  pressure = 5e-6f*dp_raw*dp_raw + 0.0551f*dp_raw;
 
   //if (qmeLog) {
     //printf("%ld: QME7E00(%d), %d, %.4f, %.1f℃\n", timestamp, ret, reading,
