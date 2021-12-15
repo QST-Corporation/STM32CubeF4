@@ -58,7 +58,7 @@
 /* Private define ------------------------------------------------------------*/
 
 /* Private macro -------------------------------------------------------------*/
-#define AS_SENSOR_DATA_STORE_ENABLE       false//true
+#define AS_SENSOR_DATA_STORE_ENABLE       true
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef    AirSpeedTimHandle;
 uint32_t splLastUpdateTime;
@@ -261,9 +261,10 @@ void AirSpeedSensorsFetchData(void)
   float qmeSpeed = 0.0f, qmeDP = 0.0f, qmeTemp = 0.0f;
   float msSpeed = 0.0f, msPress = 0.0f, msTemp = 0.0f;
   float splPress = 0.0f;
-  uint16_t msRaw = 0;
+  uint16_t msRaw =0;
+  int16_t qmeDpx10 = 0, msDpx10 = 0, qmeAirspeedx10 = 0, msAirspeedx10 = 0;
   uint32_t qmeRaw = 0;
-  uint32_t msPressRawAndTemp = 0;
+  uint32_t qmeDpAndAirspeed = 0, msDpAndAirspeed = 0;
   uint32_t qmeTimestamp = 0, msTimestamp = 0, splTimestamp = 0, freshTimestamp;
   uint32_t sensorsSample[4] = {0,};
   static uint8_t fistRunFlag = 0, sensorDataLen = 0;
@@ -279,11 +280,16 @@ void AirSpeedSensorsFetchData(void)
   qmeSpeed = cal_true_airspeed(qmeDP, pressure_static, qmeTemp);
   HAL_Delay(5);
   MS4525DO_Sensor_Update(&msRaw, &msPress, &msTemp, &msTimestamp);
-  msPressRawAndTemp = ((uint32_t)msRaw << 16 ) | (uint32_t)(msTemp*10);
   msSpeed = cal_true_airspeed(msPress, pressure_static, msTemp);
+  qmeDpx10 = (int16_t)(qmeDP*10);
+  msDpx10 = (int16_t)(msPress*10);
+  qmeAirspeedx10 = (int16_t)(qmeSpeed*10);
+  msAirspeedx10 = (int16_t)(msSpeed*10);
+  qmeDpAndAirspeed = ((uint32_t)(qmeDpx10 << 16) ) | (uint32_t)qmeAirspeedx10;
+  msDpAndAirspeed = ((uint32_t)(msDpx10 << 16) ) | (uint32_t)msAirspeedx10;
   sensorsSample[0] = freshTimestamp;
-  sensorsSample[1] = qmeRaw;//(uint32_t)(qmeDP*100);
-  sensorsSample[2] = msPressRawAndTemp;//(msPress*100);
+  sensorsSample[1] = qmeDpAndAirspeed;//(uint32_t)(qmeDP*100);
+  sensorsSample[2] = msDpAndAirspeed;//(msPress*100);
   if ((freshTimestamp - splLastUpdateTime) > 1000) {
     spl0601_update_pressure(&splPress, &splTimestamp);
     splLastUpdateTime = freshTimestamp;
@@ -331,12 +337,12 @@ void UartFlashReadHanlder(void)
 #if (AS_SENSOR_DATA_STORE_ENABLE)
   uint8_t dataAvailable = 0;
   uint32_t sensorSamples[4] = {0};
+  uint32_t sampleTimestamp;
   uint32_t splLastUpdateTime = 0, byteCnt = 0, flashByteCnt = 0;
   uint16_t index = 0;
   uint8_t restData[16] = {0,}; //1040-1024
   uint8_t restDataCnt = 0;
-  uint16_t msRaw;
-  float msTemp = 0.0f;
+  int16_t qmeDpx10, qmeAirspeedx10, msDpx10, msAirspeedx10;
 
   //printf("uartFlashReadCmd\n");
   memset(flashData, 0x00, sizeof(flashData));
@@ -347,15 +353,20 @@ void UartFlashReadHanlder(void)
     for (index=0; byteCnt+16<flashByteCnt; index++) {
       memmove((uint8_t *)sensorSamples, &flashData[byteCnt], 12);
       byteCnt += 12;
-      msRaw = sensorSamples[2] >> 16;
-      msTemp = (float)(sensorSamples[2] & 0xFFFF)/10;
+      sampleTimestamp = sensorSamples[0];
+      qmeDpx10 = (int16_t)(sensorSamples[1] >> 16);
+      qmeAirspeedx10 = (int16_t)(sensorSamples[1] & 0xFFFF);
+      msDpx10 = (int16_t)(sensorSamples[2] >> 16);
+      msAirspeedx10 = (int16_t)(sensorSamples[2] & 0xFFFF);
       if(sensorSamples[0] - splLastUpdateTime > 1000) {
         splLastUpdateTime = sensorSamples[0];
         memmove((uint8_t *)&sensorSamples[3], &flashData[byteCnt], 4);
         byteCnt += 4;
-        printf("%ld, %ld, %d, %.1f, %.2f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/, ((float)sensorSamples[3]/100));
+        printf("%02d:%02d:%03d,%.1f,%.1f,%.1f,%.1f,%.2f\n", sampleTimestamp/60000, (sampleTimestamp%60000)/1000, (sampleTimestamp%60000)%1000, \
+              (float)msDpx10/10, (float)qmeDpx10/10, (float)msAirspeedx10/10, (float)qmeAirspeedx10/10, ((float)sensorSamples[3]/100));
       } else {
-        printf("%ld, %ld, %d, %.1f\n", sensorSamples[0], sensorSamples[1], msRaw, msTemp/*+0.1f*/);
+        printf("%02d:%02d:%03d,%.1f,%.1f,%.1f,%.1f\n", sampleTimestamp/60000, (sampleTimestamp%60000)/1000, (sampleTimestamp%60000)%1000, \
+               (float)msDpx10/10, (float)qmeDpx10/10, (float)msAirspeedx10/10, (float)qmeAirspeedx10/10);
       }
     }
     if (byteCnt < flashByteCnt) {
