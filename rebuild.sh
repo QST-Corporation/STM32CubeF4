@@ -3,7 +3,7 @@
 # Should add the Keil UV4 path to PATH environment variable
 export PATH="$PATH:/c/Keil_v5/UV4"
 SDK_PATH=$PWD
-FW_PRJ_PATH=Projects/STM32F401RE-Nucleo/QST_Projects/fls110_sw_iic
+FW_PRJ_PATH=Projects/STM32F401RE-Nucleo/QST_Projects/GMP102
 FW_PRJ_NAME=MDK-ARM/Project.uvprojx
 
 
