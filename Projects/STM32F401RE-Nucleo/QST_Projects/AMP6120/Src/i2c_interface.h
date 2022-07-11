@@ -74,8 +74,8 @@ extern "C"
  *             Function Declarations
  ******************************************************/
 void BSP_I2C1_Init(void);
-HAL_StatusTypeDef BSP_I2C_Read(uint8_t *pData, uint16_t size);
-HAL_StatusTypeDef BSP_I2C_Write(uint8_t *pData, uint16_t size);
+HAL_StatusTypeDef BSP_I2C_Read(uint8_t i2c_dev_addr, uint8_t *pData, uint16_t size);
+HAL_StatusTypeDef BSP_I2C_Write(uint8_t i2c_dev_addr, uint8_t *pData, uint16_t size);
 
 #ifdef __cplusplus
 } /* extern "C" */

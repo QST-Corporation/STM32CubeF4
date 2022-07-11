@@ -59,18 +59,9 @@
  *                      Macros
  ******************************************************/
 //#define __weak __attribute__((weak))
-#define I2C_SLAVE_ADDR                0x70
-#define I2C_SLAVE_ADDR_READ           ((I2C_SLAVE_ADDR<<1)|1)
-#define I2C_SLAVE_ADDR_WRITE          ((I2C_SLAVE_ADDR<<1)|0)
 #define I2C_DEV_TIMEOUT               0xFF //I2C operation timout in ms
 
 extern void Error_Handler(void);
-
-/******** Private definitions *************************************************/
-typedef enum {
-  AMP_SUCCESS    = 0x00U,
-  AMP_ERROR      = 0x01U
-}amp_status_t;
 
 /******************************************************
  *                 Global Variables
@@ -149,34 +140,16 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* i2cHandle)
   }
 }
 
-HAL_StatusTypeDef BSP_I2C_Read(uint8_t *pData, uint16_t size)
+HAL_StatusTypeDef BSP_I2C_Read(uint8_t i2c_dev_addr, uint8_t *pData, uint16_t size)
 {
-  //return HAL_I2C_Mem_Read_2(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, I2C_DEV_TIMEOUT);
-  return HAL_I2C_Master_Receive(&hi2c1, I2C_SLAVE_ADDR_READ, pData, size, I2C_DEV_TIMEOUT);
+  uint8_t i2c_dev_read_addr = (i2c_dev_addr<<1)|1;
+  //return HAL_I2C_Mem_Read_2(&hi2c1, i2c_dev_read_addr, pData, size, I2C_DEV_TIMEOUT);
+  return HAL_I2C_Master_Receive(&hi2c1, i2c_dev_read_addr, pData, size, I2C_DEV_TIMEOUT);
 }
 
-HAL_StatusTypeDef BSP_I2C_Write(uint8_t *pData, uint16_t size)
+HAL_StatusTypeDef BSP_I2C_Write(uint8_t i2c_dev_addr, uint8_t *pData, uint16_t size)
 {
-  return HAL_I2C_Master_Transmit(&hi2c1, I2C_SLAVE_ADDR_WRITE, pData, size, I2C_DEV_TIMEOUT);
-}
-
-/******** Private function declarations ***************************************/
-
-amp_status_t AMP6120_Reg_Read(uint8_t *pData, uint16_t size)
-{
-  HAL_StatusTypeDef ret;
-  ret = BSP_I2C_Read(pData, size);
-  return ret == HAL_OK ? AMP_SUCCESS : AMP_ERROR;
-}
-
-amp_status_t AMP6120_Reg_Write(uint16_t cmd)
-{
-  HAL_StatusTypeDef ret;
-  uint8_t payload[2] = {0,};
-
-  payload[0] = cmd>>8;
-  payload[1] = cmd&0xFF;
-  ret = BSP_I2C_Write(payload, 2);
-  return ret == HAL_OK ? AMP_SUCCESS : AMP_ERROR;
+  uint8_t i2c_dev_write_addr = (i2c_dev_addr<<1)|0;
+  return HAL_I2C_Master_Transmit(&hi2c1, i2c_dev_write_addr, pData, size, I2C_DEV_TIMEOUT);
 }
 

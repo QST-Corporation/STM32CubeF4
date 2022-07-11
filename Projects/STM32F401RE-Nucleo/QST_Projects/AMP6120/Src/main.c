@@ -54,7 +54,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-uint16_t sensorOutputIntervalMS                       500
+uint16_t sensorOutputIntervalMS = 500;
 
 /* Private function prototypes -----------------------------------------------*/
 
@@ -176,8 +176,8 @@ int main(void)
   /* Infinite loop */
   while (1)
   {
-    SensorSampleOutput(&amp_entity, sensorOutputIntervalMS);
-    HAL_Delay(sensorOutputIntervalMS);
+    //SensorSampleOutput(&amp_entity, sensorOutputIntervalMS);
+    //HAL_Delay(sensorOutputIntervalMS);
   }
 }
 

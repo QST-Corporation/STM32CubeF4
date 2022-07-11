@@ -19,31 +19,31 @@
 
 /* Sensor operating status information */
 typedef union{
-    u8 all;
+    uint8_t all;
     struct{
-        u8 bit0:1;
-        u8 bit1:1;
-        u8 nvmErr:1;
-        u8 mode:1;
-        u8 bit4:1;
-        u8 busy:1;
-        u8 adcPwr:1;
-        u8 bit7:1;
+        uint8_t bit0:1;
+        uint8_t bit1:1;
+        uint8_t nvmErr:1;
+        uint8_t mode:1;
+        uint8_t bit4:1;
+        uint8_t busy:1;
+        uint8_t adcPwr:1;
+        uint8_t bit7:1;
     }bit;
 }
 amp_stus_t;
 
 /* AEF format define */
 typedef union{
-    u16 all;
+    uint16_t all;
     struct{
-        u16 gain_stage1:2;
-        u16 gain_stage2:3;
-        u16 gain_polarity:1;
-        u16 clk_divider:2;
-        u16 A2D_offset:3;
-        u16 osr_p:3;
-        u16 osr_t:2;
+        uint16_t gain_stage1:2;
+        uint16_t gain_stage2:3;
+        uint16_t gain_polarity:1;
+        uint16_t clk_divider:2;
+        uint16_t A2D_offset:3;
+        uint16_t osr_p:3;
+        uint16_t osr_t:2;
     }bit;
 }
 amp_afe_t;
@@ -51,7 +51,7 @@ amp_afe_t;
 /* NVM register define */
 #define MAX_REG_NUMBER      32
 typedef union{
-    u16 array[MAX_REG_NUMBER];
+    uint16_t array[MAX_REG_NUMBER];
 }
 amp_register_t;
 
@@ -59,52 +59,53 @@ amp_register_t;
 #define MAX_COP_NUMBER      8
 
 typedef struct{
-    u8              portID;
-    u8              started;
+    uint8_t              portID;
+    uint8_t              started;
     amp_stus_t      stus;
     amp_afe_t       afe_default;
     amp_register_t* pRegister;
-    u32             co_t_array[MAX_COT_NUMBER];
-    u32             co_p_array[MAX_COP_NUMBER];
+    uint32_t             co_t_array[MAX_COT_NUMBER];
+    uint32_t             co_p_array[MAX_COP_NUMBER];
     
-    u16             osr_p;
-    u16             osr_t;
-    u8              iir_flg;
+    uint16_t             osr_p;
+    uint16_t             osr_t;
+    uint8_t              iir_flg;
     float           odr;            /* Data output rate, unit:1Hz */
     
-    s16             tempDat_max;    /* real temperature max data, unit: 0.1 cnetigrade */
-    s16             tempDat_min;
-    u32             presDat_max;    /* real pressure max data, unit: 1hPa */
-    u32             presDat_min;
+    int16_t             tempDat_max;    /* real temperature max data, unit: 0.1 cnetigrade */
+    int16_t             tempDat_min;
+    uint32_t             presDat_max;    /* real pressure max data, unit: 1hPa */
+    uint32_t             presDat_min;
     
-    s16             temp_rt;
-    u32             pres_rt;
+    int16_t             temp_rt;
+    uint32_t             pres_rt;
     
-    u16             temp_raw;
-    u32             pres_raw;
+    uint16_t             temp_raw;
+    uint32_t             pres_raw;
     
-    u8              cmd_pres;
-    //u8              cmd_temp;
+    uint8_t              cmd_pres;
+    //uint8_t              cmd_temp;
 }
 amp_object_t;
 extern amp_object_t amp_entity;
 
 /** Global function Declarations */
-u8 amp_write_cmd(u8 *pdat, u8 len);
-u8 amp_read_stus(void);
-u8 amp_read_bytes(u8 *dst, u8 len);
-u8 amp_read_reg(u8 addr, u16 *reg);
-u8 amp_read_PresDat(u32 *pres);
-u16 amp_read_TempDat(u16 *temp);
+uint8_t amp_write_cmd(uint8_t *pdat, uint8_t len);
+uint8_t amp_read_stus(void);
+uint8_t amp_read_bytes(uint8_t *dst, uint8_t len);
+uint8_t amp_read_reg(uint8_t addr, uint16_t *reg);
+uint8_t amp_read_PresDat(uint32_t *pres);
+uint16_t amp_read_TempDat(uint16_t *temp);
 
-void Amp_Control_Req(u8 cmd, u8 osr_p, u8 osr_t);
-void Amp_ADC_Start(u8 en);
-void Amp_IIR_Enable(u8 en);
-void Amp_ODR_Set(u16 freq);
+void Amp_Control_Req(uint8_t cmd, uint8_t osr_p, uint8_t osr_t);
+void Amp_ADC_Start(uint8_t en);
+void Amp_IIR_Enable(uint8_t en);
+void Amp_ODR_Set(uint16_t freq);
 
-void SensorSampleOutput(amp_object_t *entity, u16 timebyms);
+void SensorSampleOutput(amp_object_t *entity, uint16_t timebyms);
 void AmpSensorInit(void);
 void amp6100br_Init(void);
 
 #endif /* End of amp6100br include */
+
 /*******************END OF FILE******************************************************************************/

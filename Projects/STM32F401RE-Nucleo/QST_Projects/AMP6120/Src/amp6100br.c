@@ -13,21 +13,30 @@
 /******** Includes ************************************************************/
 #include "main.h"
 #include "string.h"
-
+#include "stdbool.h"
+#include "i2c_interface.h"
 #include "amp6100br.h"
 
-extern void SendSampleData(void);
+//extern void SendSampleData(void);
 
 /******** Private definitions *************************************************/
-
 /******** Private function declarations ***************************************/
 
 /******** Variables ***********************************************************/
 amp_register_t  amp_Register;
 amp_object_t    amp_entity;
 
-/******** Function Prototype **************************************************/
-void vTask_amp6100br(void* argument);
+
+/******** Private function declarations ***************************************/
+
+uint8_t amp_read_bytes(uint8_t *pData, uint8_t size)
+{
+  HAL_StatusTypeDef ret;
+  uint8_t dev = amp_entity.portID;//AMP6100BR_DEV_ID;
+  ret = BSP_I2C_Read(dev, pData, size);
+  printf("dev(0x%x) read:%d\n", dev, ret);
+  return ret == HAL_OK ? true : false;
+}
 
 /*
  ** PRIVATE FUNCTION: amp_write_cmd()
@@ -36,62 +45,53 @@ void vTask_amp6100br(void* argument);
  *      write the request command to sensor thru iic bus.
  *
  *  PARAMETERS:
- *      *pdat: the pointer to the command.
- *      len: the length of command in bytes.
+ *      *pData: the pointer to the command.
+ *      size: the length of command in bytes.
  *             
  *  RETURNS:
  *      None.
  */  
-u8 amp_write_cmd(u8 *pdat, u8 len)
+uint8_t amp_write_cmd(uint8_t *pData, uint8_t size)
 {
-    u8 dev = amp_entity.portID;//AMP6100BR_DEV_ID;
-    u8 ret = FALSE;
-    
-    ret = bsp_iic_writeBytes(dev, len, pdat);
-    return ret;
+  HAL_StatusTypeDef ret;
+  uint8_t dev = amp_entity.portID;//AMP6100BR_DEV_ID;
+
+  ret = BSP_I2C_Write(dev, pData, size);
+  printf("dev(0x%x)write(%d):0x%x, ret:%d\n", dev, size, *pData, ret);
+  return ret == HAL_OK ? true : false;
 }
 
 /*
  ** PRIVATE FUNCTION: amp_read_stus()
  *
  */  
-u8 amp_read_stus(void)
+uint8_t amp_read_stus(void)
 {  
-    u8 dev = amp_entity.portID;
-    u8 stus;
-    bsp_iic_readBytes(dev, 1, (u8*)&stus);
+    uint8_t dev = amp_entity.portID;
+    uint8_t stus;
+    BSP_I2C_Read(dev, &stus, 1);
     return stus;
 }
-/*
- ** PRIVATE FUNCTION: amp_read_bytes()
- *
- */  
-u8 amp_read_bytes(u8 *dst, u8 len)
-{
-    u8 dev = amp_entity.portID;//AMP6100BR_DEV_ID;
-    u8 ret = FALSE;
-    
-    ret = bsp_iic_readBytes(dev, len, dst);
-    return ret;
-}
+
 /*
  ** PRIVATE FUNCTION: amp_read_reg()
  *
  */  
-u8 amp_read_reg(u8 addr, u16 *reg)
+uint8_t amp_read_reg(uint8_t addr, uint16_t *reg)
 {
-    u8 dev = amp_entity.portID;
-    u8 ret = FALSE;
-    u8 adr = addr;
-    u8 buf[3];
+    uint8_t ret = false;
+    uint8_t adr = addr;
+    uint8_t buf[3];
     
     ret = amp_write_cmd(&adr, 1);
+    printf("cmd:%d\n", ret);
     
-    if (ret == TRUE){
-        ret = bsp_iic_readBytes(dev, 3, buf);
+    if (ret == true){
+        ret = amp_read_bytes(buf, 2);
+        printf("read:%d\n", ret);
         
-        if (ret == TRUE){
-            *reg = (((u16)buf[1])<<8) + buf[2];
+        if (ret == true){
+            *reg = (((uint16_t)buf[1])<<8) + buf[2];
         }
     }
     
@@ -101,63 +101,59 @@ u8 amp_read_reg(u8 addr, u16 *reg)
  ** PRIVATE FUNCTION: amp_read_PresDat()
  *
  */  
-u8 amp_read_PresDat(u32 *pres)
+uint8_t amp_read_PresDat(uint32_t *pres)
 {
-    u8 dev = amp_entity.portID;//AMP6100BR_DEV_ID;
-    u8 buf[5];
+    uint8_t buf[5];
     
-    if (bsp_iic_readBytes(dev, 4, buf)){
-        *pres = ((u32)buf[1]<<16) + ((u32)buf[2]<<8) + buf[3];
-        return TRUE;
+    if (amp_read_bytes(buf, 4)){
+        *pres = ((uint32_t)buf[1]<<16) + ((uint32_t)buf[2]<<8) + buf[3];
+        return true;
     }
     
-    return FALSE;
+    return false;
 }
 /*
  ** PRIVATE FUNCTION: amp_read_ADResult()
  *
  */  
-u8 amp_read_ADResult(u8 *pDat, u8 size)
+uint8_t amp_read_ADResult(uint8_t *pDat, uint8_t size)
 {
-    u8 dev = amp_entity.portID;//AMP6100BR_DEV_ID;
-    
-    if (bsp_iic_readBytes(dev, size, pDat)){
-        return TRUE;
+    if (amp_read_bytes(pDat, size)){
+        return true;
     }
-    
-    return FALSE;
+
+    return false;
 }
 
 /*
  ** PRIVATE FUNCTION: amp_read_TempDat()
  *
  */ 
-u16 amp_read_TempDat(u16 *temp)
+uint16_t amp_read_TempDat(uint16_t *temp)
 {
-    u8 dev = amp_entity.portID;
-    u8 buf[5];
-    
-    if (bsp_iic_readBytes(dev, 4, buf)){
-        *temp = ((u16)buf[2]<<8) + buf[3];
-        return TRUE;
+    uint8_t buf[5];
+
+    if (amp_read_bytes(buf, 4)){
+        *temp = ((uint16_t)buf[2]<<8) + buf[3];
+        return true;
     }
-    
-    return FALSE;
+
+    return false;
 }
 
 /*
  ** PRIVATE FUNCTION: TempDat_Convert()
  *
  */ 
-s16 TempDat_Convert(u16 raw, u8 iir, s16 temp_max, s16 temp_min)
+int16_t TempDat_Convert(uint16_t raw, uint8_t iir, int16_t temp_max, int16_t temp_min)
 {
-    s16 tmp = 0;
+    int16_t tmp = 0;
     
     if (iir){
-        tmp = ((s32)raw * (temp_max - temp_min) >> 16) + temp_min;
+        tmp = ((int32_t)raw * (temp_max - temp_min) >> 16) + temp_min;
     }
     else{
-        tmp = ((s32)raw * (temp_max - temp_min) >> 16) + temp_min;
+        tmp = ((int32_t)raw * (temp_max - temp_min) >> 16) + temp_min;
     }
     
     tmp  = (tmp > temp_max) ? temp_max : ((tmp < temp_min) ? temp_min : tmp);
@@ -171,8 +167,8 @@ s16 TempDat_Convert(u16 raw, u8 iir, s16 temp_max, s16 temp_min)
  ** PRIVATE FUNCTION: iir_prs_filter()
  *
  */ 
-u32 raw_hisotry = 0xFFFFFFFF;
-u32 iir_prs_filter(u32 raw, u8 iir)
+uint32_t raw_hisotry = 0xFFFFFFFF;
+uint32_t iir_prs_filter(uint32_t raw, uint8_t iir)
 {
 	if (iir !=0 && raw_hisotry != 0xFFFFFFFF)
 	{
@@ -186,31 +182,31 @@ u32 iir_prs_filter(u32 raw, u8 iir)
  ** PRIVATE FUNCTION: PresDat_Convert()
  *
  */ 
-u32 PresDat_Convert(u32 raw, u8 iir, s32 pres_max, s32 pres_min)
+uint32_t PresDat_Convert(uint32_t raw, uint8_t iir, int32_t pres_max, int32_t pres_min)
 {
-    u32 tmp = 0;
+    uint32_t tmp = 0;
     
     if (iir){
-        u64 tmp64;
+        uint64_t tmp64;
 
         tmp64 = iir_prs_filter(raw, iir);
-        tmp = ((u64)tmp64 * (pres_max - pres_min) >> 24) + pres_min;
+        tmp = ((uint64_t)tmp64 * (pres_max - pres_min) >> 24) + pres_min;
     }
     else{
-        tmp = ((u64)raw * (pres_max - pres_min) >> 24) + pres_min;
+        tmp = ((uint64_t)raw * (pres_max - pres_min) >> 24) + pres_min;
     }
     
     tmp  = (tmp > pres_max) ? pres_max : ((tmp < pres_min) ? pres_min : tmp);
     
-    return (u32)tmp;
+    return (uint32_t)tmp;
 }
 /*
  ** PUBLIC FUNCTION: Amp_Control_Req()
  *
  */ 
-void Amp_Control_Req(u8 cmd, u8 osr_p, u8 osr_t)
+void Amp_Control_Req(uint8_t cmd, uint8_t osr_p, uint8_t osr_t)
 {
-    u8 t_cmd = cmd;
+    uint8_t t_cmd = cmd;
     switch(cmd){
     case 0xAC:
         amp_entity.cmd_pres = t_cmd;
@@ -244,9 +240,9 @@ void Amp_Control_Req(u8 cmd, u8 osr_p, u8 osr_t)
  ** PRIVATE FUNCTION: osr_config_set()
  *
  */ 
-u8 osr_config_set(u8 osr_p, u8 osr_t)
+uint8_t osr_config_set(uint8_t osr_p, uint8_t osr_t)
 {
-	u8 cmd = 0xB0;
+	uint8_t cmd = 0xB0;
 	
 	if (osr_t == 8){
 		cmd |= 0x08;
@@ -268,7 +264,7 @@ u8 osr_config_set(u8 osr_p, u8 osr_t)
  ** PUBLIC FUNCTION: Amp_ADC_Start()
  *
  */ 
-void Amp_ADC_Start(u8 en)
+void Amp_ADC_Start(uint8_t en)
 {
     if (en)
         amp_entity.started = 1;
@@ -288,7 +284,7 @@ void Amp_ADC_Start(u8 en)
  *  RETURNS:
  *      None.
  */ 
-void Amp_IIR_Enable(u8 en)
+void Amp_IIR_Enable(uint8_t en)
 {
     amp_entity.iir_flg = en;
 }
@@ -297,7 +293,7 @@ void Amp_IIR_Enable(u8 en)
  ** PUBLIC FUNCTION: Amp_ODR_Set()
  *
  */ 
-void Amp_ODR_Set(u16 freq)
+void Amp_ODR_Set(uint16_t freq)
 {
     if (freq >=1 && freq <= 100){  // 1~100Hz
         amp_entity.odr = (float)freq;
@@ -308,16 +304,16 @@ void Amp_ODR_Set(u16 freq)
  ** PUBLIC FUNCTION: SensorSampleOutput()
  *
  */ 
-u16 timeDelay = 0;
-u8 tmpbuf[10];
-void SensorSampleOutput(amp_object_t *entity, u16 timebyms)
+uint16_t timeDelay = 0;
+uint8_t tmpbuf[10];
+void SensorSampleOutput(amp_object_t *entity, uint16_t timebyms)
 {
-    static u16 timer;
-    u16 cyclebyms = (u16)((float)1000.0/entity->odr) + 1;
-    u16 raw_temp=0xFFFF;//, timeDelay;
-    u32 raw_pres=0x00FFFFFF;
-    u8 cmd;
-    u32 tmp32;
+    static uint16_t timer;
+    uint16_t cyclebyms = (uint16_t)((float)1000.0/entity->odr) + 1;
+    uint16_t raw_temp=0xFFFF;//, timeDelay;
+    uint32_t raw_pres=0x00FFFFFF;
+    uint8_t cmd;
+    //uint32_t tmp32;
     
     if (entity->started == 0){
         return;
@@ -333,7 +329,7 @@ void SensorSampleOutput(amp_object_t *entity, u16 timebyms)
         amp_write_cmd(tmpbuf, 1);
 
         /* 2. Waiting */
-        vTaskDelay(2);//delay_us(5000);
+        HAL_Delay(2);//vTaskDelay(2);//delay_us(5000);
         for(timeDelay = 0; timeDelay < 0x02FF; timeDelay++){
             amp_stus_t stus;
             stus.all = amp_read_stus();
@@ -347,8 +343,8 @@ void SensorSampleOutput(amp_object_t *entity, u16 timebyms)
         /* 3. Read AD result */
         if (amp_read_ADResult(tmpbuf, 6)){
             entity->stus.all = tmpbuf[0];
-            raw_pres = ((u32)tmpbuf[1]<<16) + ((u32)tmpbuf[2]<<8) + ((u32)tmpbuf[3]<<0);
-            raw_temp = ((u16)tmpbuf[4]<< 8) + ((u16)tmpbuf[5]<<0);
+            raw_pres = ((uint32_t)tmpbuf[1]<<16) + ((uint32_t)tmpbuf[2]<<8) + ((uint32_t)tmpbuf[3]<<0);
+            raw_temp = ((uint16_t)tmpbuf[4]<< 8) + ((uint16_t)tmpbuf[5]<<0);
         }
         
         /* 4. Convert raw to real value */
@@ -361,8 +357,11 @@ void SensorSampleOutput(amp_object_t *entity, u16 timebyms)
             entity->temp_raw = raw_temp;
             entity->temp_rt = TempDat_Convert(raw_temp, entity->iir_flg, entity->tempDat_max, entity->tempDat_min);
         }
-        SendSampleData();
-        
+#if 0
+        //SendSampleData();
+#else
+        printf("pres_rt:%ld, temp_rt:%ld\n", entity->pres_rt, entity->temp_rt);
+#endif
     }
 }
 
@@ -394,62 +393,13 @@ void AmpSensorInit(void)
     
     entity->cmd_pres = osr_config_set(entity->osr_p, entity->osr_t);
     
-    for(u8 i = 0; i < MAX_REG_NUMBER; i++){
-        //amp_read_reg(i, &amp_Register.array[i]);
+    for(uint8_t i = 0; i < MAX_REG_NUMBER; i++){
+        amp_read_reg(i, &amp_Register.array[i]);
+        printf("0x%x%s", amp_Register.array[i], (i+1)%4?",":"\n");
     }
     entity->afe_default.all = entity->pRegister->array[14];
     
     entity->started = 1;    // only for debug
-}
-
-/*
- ** PUBLIC FUNCTION: amp6100br_Init()
- *
- *  DESCRIPTION:
- *      Initialize the amp6100br task.
- *
- *  PARAMETERS:
- *      None.
- *             
- *  RETURNS:
- *      None.
- */
-void amp6100br_Init(void) {
-    
-	xTaskCreate(vTask_amp6100br,
-		"amp6100br handle",
-		2048/4,  // In words, not bytes
-		NULL,
-		2,
-		(TaskHandle_t*)NULL);
-}
-
-/*
- ** PUBLIC FUNCTION: vTask_amp6100br()
- *
- *  DESCRIPTION:
- *      the amp6100br task.
- *
- *  PARAMETERS:
- *      None.
- *             
- *  RETURNS:
- *      None.
- */
-u8 db_data1;
-void vTask_amp6100br(void* argument) 
-{
-	uint32_t millisec = 2;
-	TickType_t ticks = pdMS_TO_TICKS(millisec);
-    
-    AmpSensorInit();
-    
-	for (;;) {
-        
-        SensorSampleOutput(&amp_entity, millisec);
-        
-        vTaskDelay(ticks);
-    }
 }
 
 
