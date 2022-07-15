@@ -34,7 +34,7 @@ uint8_t amp_read_bytes(uint8_t *pData, uint8_t size)
   HAL_StatusTypeDef ret;
   uint8_t dev = amp_entity.portID;//AMP6100BR_DEV_ID;
   ret = BSP_I2C_Read(dev, pData, size);
-  printf("dev(0x%x) read:%d\n", dev, ret);
+  //printf("dev(0x%x) read:%d\n", dev, ret);
   return ret == HAL_OK ? true : false;
 }
 
@@ -57,7 +57,7 @@ uint8_t amp_write_cmd(uint8_t *pData, uint8_t size)
   uint8_t dev = amp_entity.portID;//AMP6100BR_DEV_ID;
 
   ret = BSP_I2C_Write(dev, pData, size);
-  printf("dev(0x%x)write(%d):0x%x, ret:%d\n", dev, size, *pData, ret);
+  //printf("dev(0x%x)write(%d):0x%x, ret:%d\n", dev, size, *pData, ret);
   return ret == HAL_OK ? true : false;
 }
 
@@ -314,12 +314,15 @@ void SensorSampleOutput(amp_object_t *entity, uint16_t timebyms)
     uint32_t raw_pres=0x00FFFFFF;
     uint8_t cmd;
     //uint32_t tmp32;
+    uint32_t sampleTimestamp;
     
     if (entity->started == 0){
         return;
     }
     
     timer++;
+    // printf("Time:%ld, timer:%d, timebyms:%d, cycle:%d\n",
+    //          HAL_GetTick(), timer, timebyms, cyclebyms);
     if (timer*timebyms >= cyclebyms){
         timer = 0;
         cmd = entity->cmd_pres;
@@ -339,7 +342,9 @@ void SensorSampleOutput(amp_object_t *entity, uint16_t timebyms)
                 break;
             }
         }
-        
+
+        sampleTimestamp = HAL_GetTick();
+
         /* 3. Read AD result */
         if (amp_read_ADResult(tmpbuf, 6)){
             entity->stus.all = tmpbuf[0];
@@ -360,7 +365,9 @@ void SensorSampleOutput(amp_object_t *entity, uint16_t timebyms)
 #if 0
         //SendSampleData();
 #else
-        printf("pres_rt:%ld, temp_rt:%ld\n", entity->pres_rt, entity->temp_rt);
+        printf("[%02d:%02d:%03d]: pres:%ld, temp:%ld\n", sampleTimestamp/60000, \
+                                   (sampleTimestamp%60000)/1000, (sampleTimestamp%60000)%1000, \
+                                   entity->pres_rt, entity->temp_rt);
 #endif
     }
 }
