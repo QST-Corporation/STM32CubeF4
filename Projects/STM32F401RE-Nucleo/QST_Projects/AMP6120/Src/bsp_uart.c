@@ -340,3 +340,15 @@ void BSP_UART_Init(void)
   BSP_COM_Init();
 }
 
+void BSP_Button_Init(void)
+{
+  GPIO_InitTypeDef  GPIO_InitStruct;
+
+  /*Configure GPIO pin : B1_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+}

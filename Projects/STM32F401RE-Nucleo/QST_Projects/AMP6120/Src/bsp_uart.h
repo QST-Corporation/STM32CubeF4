@@ -80,6 +80,7 @@ int BSP_COM_Read(uint8_t* data_in, uint32_t expected_data_size, uint32_t timeout
 //int BSP_COM_BytesInBuffer(void);
 //void BSP_COM_IRQHandler(void);
 void BSP_UART_Init(void);
+void BSP_Button_Init(void);
 
 #ifdef __cplusplus
 } /* extern "C" */

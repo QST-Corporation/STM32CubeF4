@@ -394,8 +394,8 @@ void AmpSensorInit(void)
     entity->cmd_pres = osr_config_set(entity->osr_p, entity->osr_t);
     
     for(uint8_t i = 0; i < MAX_REG_NUMBER; i++){
-        amp_read_reg(i, &amp_Register.array[i]);
-        printf("0x%x%s", amp_Register.array[i], (i+1)%4?",":"\n");
+        //amp_read_reg(i, &amp_Register.array[i]);
+        //printf("0x%x%s", amp_Register.array[i], (i+1)%4?",":"\n");
     }
     entity->afe_default.all = entity->pRegister->array[14];
     

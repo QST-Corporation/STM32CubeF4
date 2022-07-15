@@ -139,12 +139,63 @@ static void SystemClock_Config(void)
 
 static void BSP_Device_Init(void)
 {
+  BSP_Button_Init();
+
   /* Configure LED2 */
   BSP_LED_Init(LED2);
 
   /* Configure LOG UART and Communication UART */
   BSP_UART_Init();
 }
+
+uint8_t gButtonPressed = false;
+uint8_t gButtonLongPressed = false;
+
+void BSP_Button_Polling(void)
+{
+  volatile GPIO_PinState buttonStatus;
+  static bool shortPressed = false, longPressed = false;
+  static uint32_t pressedFreshTime = 0, ledFreshTime = 0;
+
+  buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+
+  if(buttonStatus == GPIO_PIN_RESET)
+  {
+    HAL_Delay(10);
+    buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+    if (buttonStatus == GPIO_PIN_RESET) {
+      if ((shortPressed == false) && (longPressed == false)) {
+        pressedFreshTime = HAL_GetTick();
+        //printf("short pressed\n");
+        shortPressed = true;
+      }else if((HAL_GetTick() - pressedFreshTime) > 3000){
+        if (longPressed == false) {
+          printf("long Pressed\n");
+          longPressed = true;
+          shortPressed = false;
+        } else if ((HAL_GetTick() - ledFreshTime) > 200) {
+          ledFreshTime = HAL_GetTick();
+          BSP_LED_Toggle(LED2);
+        }
+      }
+    }
+  } else {
+    HAL_Delay(10);
+    buttonStatus = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13);
+    if(buttonStatus == GPIO_PIN_SET) {
+      if (shortPressed) {
+        shortPressed = false;
+        gButtonPressed = true;
+        printf("short pressed\n");
+      } else if (longPressed) {
+        longPressed = false;
+        gButtonLongPressed = true;
+        printf("long pressed\n");
+      }
+    }
+  }
+}
+
 
 /**
   * @brief  Main program
@@ -176,8 +227,14 @@ int main(void)
   /* Infinite loop */
   while (1)
   {
-    //SensorSampleOutput(&amp_entity, sensorOutputIntervalMS);
-    //HAL_Delay(sensorOutputIntervalMS);
+    // BSP_Button_Polling();
+    // if (gButtonPressed) {
+    //   gButtonPressed = false;
+    //   printf("SensorSampleOutput\n");
+    //   SensorSampleOutput(&amp_entity, sensorOutputIntervalMS);//AmpSensorInit();
+    // }
+    SensorSampleOutput(&amp_entity, sensorOutputIntervalMS);
+    HAL_Delay(sensorOutputIntervalMS);
   }
 }
 
