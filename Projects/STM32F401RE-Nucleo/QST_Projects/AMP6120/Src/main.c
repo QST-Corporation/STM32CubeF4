@@ -54,7 +54,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-uint16_t sensorOutputIntervalMS = 10;
+uint16_t sensorOutputIntervalMS = 5;
 
 /* Private function prototypes -----------------------------------------------*/
 

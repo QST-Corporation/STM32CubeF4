@@ -390,8 +390,8 @@ void AmpSensorInit(void)
     
     entity->osr_p = 16;
     entity->osr_t = 4;
-    entity->iir_flg = 1;
-    entity->odr = 1.0;       /* 1Hz */
+    entity->iir_flg = 16;
+    entity->odr = 100.0;       /* 1Hz */
     
     entity->tempDat_max = 1500;
     entity->tempDat_min = -400;
